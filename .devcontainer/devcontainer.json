@@ -1,0 +1,23 @@
+{
+  "name": "Web App & MySQL Dev Container",
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "cweijan.vscode-database-client2",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "forwardPorts": [
+    3000,
+    3306
+  ],
+  "postCreateCommand": "npm install",
+  "remoteUser": "node"
+}

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preselección Asistida - Nexxo S.A.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header principal -->
+    <header class="top-nav">
+      <div class="brand">
+        <span class="company-logo">NEXXO S.A.</span>
+        <span class="group-tag">Grupo Echeverría Izquierdo</span>
+      </div>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link active">Portal Candidato</a>
+        <a href="admin.html" class="nav-link admin-btn">🔒 Panel Reclutador</a>
+      </div>
+    </header>
+
+    <main class="main-container">
+      <!-- Encabezado del Portal -->
+      <section class="portal-header">
+        <span class="mining-tag">Plataforma de Preselección Operativa Minera</span>
+        <h1>Evaluación de Ingreso a Faena</h1>
+        <p class="subtitle">Complete los 3 sencillos pasos para validar su postulación en menos de 5 minutos.</p>
+      </section>
+
+      <!-- Indicador de Pasos (Wizard Progress) -->
+      <div class="wizard-steps">
+        <div class="step-item active" id="step-nav-1">
+          <span class="step-num">1</span>
+          <span class="step-text">Datos & Documentos</span>
+        </div>
+        <div class="step-divider"></div>
+        <div class="step-item" id="step-nav-2">
+          <span class="step-num">2</span>
+          <span class="step-text">Prueba Técnica</span>
+        </div>
+        <div class="step-divider"></div>
+        <div class="step-item" id="step-nav-3">
+          <span class="step-num">3</span>
+          <span class="step-text">Evaluación de Voz</span>
+        </div>
+      </div>
+
+      <!-- PASO 1: DATOS, DOCUMENTOS Y SELFIE INICIAL -->
+      <div class="step-card" id="wizard-step-1">
+        <h2>📋 Paso 1: Requisitos Excluyentes & Identificación</h2>
+        <p class="section-desc">Ingrese sus datos fidedignos y adjunte la información requerida.</p>
+
+        <form id="form-step-1" class="custom-form">
+          <div class="form-grid">
+            <div class="field-group">
+              <label for="full_name">Nombre Completo *</label>
+              <input type="text" id="full_name" placeholder="ej. Juan Carlos Pérez González" required>
+            </div>
+
+            <div class="field-group">
+              <label for="rut_id">RUT o Cédula de Identidad *</label>
+              <input type="text" id="rut_id" placeholder="ej. 15.678.901-2" required>
+            </div>
+
+            <div class="field-group">
+              <label for="age">Edad (Requisito Excluyente >25 años) *</label>
+              <input type="number" id="age" min="18" max="75" placeholder="ej. 29" required>
+              <span class="field-hint alert-hint">⚠️ Debe tener 25 años o más para calificar en faenas mineras.</span>
+            </div>
+
+            <div class="field-group">
+              <label for="position_id">Cargo al que Postula *</label>
+              <select id="position_id" required>
+                <option value="">Cargando cargos disponibles...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Documentos -->
+          <div class="docs-section">
+            <div class="doc-box">
+              <label>📜 Certificado de Estudios / Técnico</label>
+              <input type="file" id="file-cert" accept="image/*" class="file-input">
+              <span class="file-status" id="cert-status">Seleccionar imagen o foto de certificado</span>
+            </div>
+
+            <div class="doc-box">
+              <label>🛡️ Certificado de Antecedentes Penales</label>
+              <input type="file" id="file-antecedentes" accept="image/*" class="file-input">
+              <span class="file-status" id="antecedentes-status">Seleccionar foto de certificado sin antecedentes</span>
+            </div>
+          </div>
+
+          <!-- Captura Biométrica Inicial -->
+          <div class="camera-card">
+            <h3>📸 Verificación Biométrica (Selfie de Identidad)</h3>
+            <p class="camera-desc">Permita el acceso a su cámara web y tómese una foto clara mirando al frente.</p>
+
+            <div class="camera-wrapper">
+              <video id="webcam-view" autoplay playsinline muted></video>
+              <canvas id="photo-canvas" style="display:none;"></canvas>
+              <img id="selfie-preview" style="display:none;" alt="Selfie Capturada">
+            </div>
+
+            <div class="camera-actions">
+              <button type="button" class="btn btn-secondary" id="btn-start-camera">🎥 Iniciar Cámara</button>
+              <button type="button" class="btn btn-camera" id="btn-take-selfie" disabled>📸 Capturar Foto</button>
+            </div>
+          </div>
+
+          <div class="action-bar">
+            <button type="submit" class="btn btn-primary btn-large">
+              <span>Continuar a Prueba Técnica ➔</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- PASO 2: PRUEBA TÉCNICA Y ANTI-TRAMPA -->
+      <div class="step-card" id="wizard-step-2" style="display:none;">
+        <div class="quiz-header">
+          <div>
+            <h2>⏱️ Paso 2: Evaluación Técnica con Cronómetro</h2>
+            <p class="section-desc">Preguntas aleatorias sobre procedimientos de seguridad y operabilidad.</p>
+          </div>
+          <div class="timer-badge">
+            <span class="timer-icon">⏳</span>
+            <span id="quiz-timer">30s</span>
+          </div>
+        </div>
+
+        <div class="quiz-container" id="quiz-card">
+          <div class="question-progress">
+            Pregunta <span id="q-current">1</span> de <span id="q-total">4</span>
+          </div>
+          <h3 class="question-title" id="question-text">Cargando pregunta...</h3>
+
+          <div class="options-grid" id="options-container">
+            <!-- Opciones generadas por JS -->
+          </div>
+        </div>
+
+        <!-- Cámara silenciosa en segundo plano para captura anti-trampa -->
+        <video id="silent-webcam" autoplay playsinline muted style="display:none;"></video>
+
+        <div class="action-bar">
+          <button type="button" class="btn btn-primary btn-large" id="btn-next-question">
+            <span>Siguiente Pregunta ➔</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- PASO 3: EVALUACIÓN SITUACIONAL DE AUDIO -->
+      <div class="step-card" id="wizard-step-3" style="display:none;">
+        <h2>🎙️ Paso 3: Evaluación Situacional de Voz</h2>
+        <p class="section-desc">Demuestre su comprensión y capacidad de comunicación oral en un escenario real de minería.</p>
+
+        <div class="audio-prompt-box">
+          <span class="prompt-tag">Escenario Técnico:</span>
+          <p id="audio-prompt-text">🔒 Presione el botón <strong>"Grabar Audio"</strong> para revelar su pregunta situacional y comenzar la evaluación.</p>
+        </div>
+
+        <div class="recorder-card">
+          <div class="recorder-status">
+            <div class="rec-dot" id="rec-dot"></div>
+            <span id="rec-status-text">Presione el botón para iniciar la grabación (Máximo 1 minuto)</span>
+          </div>
+          <div class="timer-display" id="audio-timer">00:00</div>
+
+          <div class="recorder-controls">
+            <button type="button" class="btn btn-mic" id="btn-record-audio">
+              🎙️ Grabar Audio
+            </button>
+            <button type="button" class="btn btn-stop" id="btn-stop-audio" style="display:none;">
+              ⏹️ Detener Grabación
+            </button>
+          </div>
+
+          <audio id="audio-preview" controls style="display:none; margin-top: 1rem; width: 100%;"></audio>
+        </div>
+
+        <div class="action-bar">
+          <button type="button" class="btn btn-success btn-large" id="btn-submit-all">
+            <span>🚀 Finalizar y Enviar Postulación</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- PASO 4: CONFIRMACIÓN Y RESULTADO -->
+      <div class="step-card text-center" id="wizard-step-4" style="display:none;">
+        <div class="success-icon">🎉</div>
+        <h2>¡Postulación Completada Exitosamente!</h2>
+        <p class="section-desc">Sus datos, prueba técnica, biometría y grabación de audio han sido procesados en el sistema de Nexxo S.A.</p>
+
+        <div class="result-box" id="result-summary">
+          <!-- Detalle de resultado por JS -->
+        </div>
+
+        <div style="margin-top: 2rem;">
+          <a href="index.html" class="btn btn-secondary">Realizar Otra Postulación</a>
+          <a href="admin.html" class="btn btn-primary" style="margin-left: 1rem;">Ver en Panel Reclutador</a>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

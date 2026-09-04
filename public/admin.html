@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Reclutador - Nexxo S.A.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header principal -->
+    <header class="top-nav">
+      <div class="brand">
+        <span class="company-logo">NEXXO S.A.</span>
+        <span class="group-tag">Panel Reclutamiento & Gestión</span>
+      </div>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">⬅ Portal Candidato</a>
+        <a href="admin.html" class="nav-link active">🔒 Panel Reclutador</a>
+      </div>
+    </header>
+
+    <main class="main-container full-width">
+      <!-- Header del Panel -->
+      <section class="portal-header">
+        <span class="mining-tag">Control de Contratación & Medición de Rotación</span>
+        <h1>Gestión de Preselección Asistida</h1>
+        <p class="subtitle">Auditoría de candidatos, verificación de biometría anti-trampa, evaluación oral y cálculo de impacto económico.</p>
+      </section>
+
+      <!-- Métricas de Impacto Económico -->
+      <section class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-label">Total Postulantes</span>
+          <span class="metric-value" id="metric-total">0</span>
+          <span class="metric-desc">Evaluados por plataforma</span>
+        </div>
+
+        <div class="metric-card metric-success">
+          <span class="metric-label">Candidatos Aptos</span>
+          <span class="metric-value" id="metric-approved">0</span>
+          <span class="metric-desc">Aprobados para entrevista</span>
+        </div>
+
+        <div class="metric-card metric-warning">
+          <span class="metric-label">Filtrados / Rechazados</span>
+          <span class="metric-value" id="metric-rejected">0</span>
+          <span class="metric-desc">No cumplen requisitos</span>
+        </div>
+
+        <div class="metric-card metric-highlight">
+          <span class="metric-label">Ahorro Económico Estimado</span>
+          <span class="metric-value" id="metric-savings">$0 CLP</span>
+          <span class="metric-desc">Gasto hundido evitado por rotación</span>
+        </div>
+      </section>
+
+      <!-- Filtros y Tabla -->
+      <section class="card admin-card">
+        <div class="table-header-tools">
+          <h2>👥 Postulaciones Recibidas</h2>
+          
+          <div class="filters-bar">
+            <div class="filter-group">
+              <label for="filter-position">Cargo:</label>
+              <select id="filter-position">
+                <option value="">Todos los cargos</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="filter-status">Estado:</label>
+              <select id="filter-status">
+                <option value="">Todos los estados</option>
+                <option value="Pendiente">Pendientes</option>
+                <option value="Aprobado">Aprobados</option>
+                <option value="Rechazado">Rechazados</option>
+              </select>
+            </div>
+
+            <button class="btn btn-secondary" id="btn-refresh">🔄 Actualizar</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Candidato</th>
+                <th>RUT</th>
+                <th>Edad</th>
+                <th>Cargo</th>
+                <th>Prueba Técnica</th>
+                <th>Audio & Biometría</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="candidates-tbody">
+              <tr>
+                <td colspan="9" class="loading-td">Cargando postulaciones desde MySQL...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal Detalle Candidato -->
+    <div class="modal-backdrop" id="modal-candidate" style="display:none;">
+      <div class="modal-box">
+        <button type="button" class="modal-close" id="btn-close-modal">&times;</button>
+        <h2 id="modal-title">Detalle del Candidato</h2>
+
+        <div class="modal-content-grid" id="modal-body">
+          <!-- Detalle inyectado por JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

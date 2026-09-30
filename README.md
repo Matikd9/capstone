@@ -1,10 +1,10 @@
-# 🐳 Entorno de Desarrollo Dev Container (Web + MySQL)
+# Entorno de Desarrollo Dev Container (Web + MySQL)
 
 Este proyecto está 100% configurado para ejecutarse dentro de un **Dev Container de Docker** con **Node.js 20 (Express)** y **MySQL 8.0**.
 
 ---
 
-## 🚀 Pasos para empezar a programar dentro del contenedor
+## Pasos para empezar a programar dentro del contenedor
 
 ### 1. Requisitos
 * Tener **Docker Desktop** abierto y corriendo en tu computadora.
@@ -16,7 +16,7 @@ Este proyecto está 100% configurado para ejecutarse dentro de un **Dev Containe
 
 1. Presiona la tecla `F1` (o `Ctrl + Shift + P` / `Cmd + Shift + P`).
 2. Escribe y selecciona el comando:  
-   👉 **`Dev Containers: Reopen in Container`**
+   **`Dev Containers: Reopen in Container`**
 3. El editor se conectará a Docker, creará la imagen, levantará el contenedor de Node.js y MySQL automáticamente.
 
 ---
@@ -34,7 +34,7 @@ Una vez dentro del contenedor (lo verás en la barra inferior izquierda del IDE 
 
 ---
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 * **`.devcontainer/`**: Configuración de Docker Compose y VS Code Dev Container.
 * **`src/server.js`**: Servidor Web backend con Express y conexión a MySQL.
@@ -43,7 +43,7 @@ Una vez dentro del contenedor (lo verás en la barra inferior izquierda del IDE 
 
 ---
 
-## 🗄️ Conexión a MySQL desde el IDE
+## Conexión a MySQL desde el IDE
 
 Puedes conectar cualquier cliente de base de datos (o la extensión **Database Client** preinstalada) usando estas credenciales:
 

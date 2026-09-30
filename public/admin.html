@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panel Reclutador - Nexxo S.A.</title>
+  <title>Panel RR.HH. & Exportación WebControl - Nexxo S.A.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -15,73 +15,81 @@
     <header class="top-nav">
       <div class="brand">
         <span class="company-logo">NEXXO S.A.</span>
-        <span class="group-tag">Panel Reclutamiento & Gestión</span>
+        <span class="group-tag">RR.HH. & Pre-Acreditación División El Teniente (WebControl)</span>
       </div>
       <div class="nav-links">
-        <a href="index.html" class="nav-link">⬅ Portal Candidato</a>
-        <a href="admin.html" class="nav-link active">🔒 Panel Reclutador</a>
+        <a href="index.html" class="nav-link">Portal Convocatoria</a>
+        <a href="admin.html" class="nav-link active">Panel RR.HH. / WebControl</a>
       </div>
     </header>
 
     <main class="main-container full-width">
       <!-- Header del Panel -->
       <section class="portal-header">
-        <span class="mining-tag">Control de Contratación & Medición de Rotación</span>
-        <h1>Gestión de Preselección Asistida</h1>
-        <p class="subtitle">Auditoría de candidatos, verificación de biometría anti-trampa, evaluación oral y cálculo de impacto económico.</p>
+        <span class="mining-tag">Fase 4: Consolidación de Nómina & Exportación WebControl (Codelco)</span>
+        <h1>Gestión de Pre-Acreditación y Validación Cruzada OCR</h1>
+        <p class="subtitle">Supervisión por excepción: RR.HH. solo interviene en casos <code>EN_REVISION_MANUAL</code> y exporta con un clic las carpetas <code>PRE_ACREDITADO</code> para paradas de planta.</p>
       </section>
 
-      <!-- Métricas de Impacto Económico -->
+      <!-- Métricas de Impacto Operativo y Económico -->
       <section class="metrics-grid">
         <div class="metric-card">
-          <span class="metric-label">Total Postulantes</span>
+          <span class="metric-label">Total Postulaciones</span>
           <span class="metric-value" id="metric-total">0</span>
-          <span class="metric-desc">Evaluados por plataforma</span>
+          <span class="metric-desc">Procesadas por el motor OCR</span>
         </div>
 
         <div class="metric-card metric-success">
-          <span class="metric-label">Candidatos Aptos</span>
+          <span class="metric-label">Pre-Acreditados / Nómina</span>
           <span class="metric-value" id="metric-approved">0</span>
-          <span class="metric-desc">Aprobados para entrevista</span>
+          <span class="metric-desc">Listos para exportar a WebControl</span>
+        </div>
+
+        <div class="metric-card">
+          <span class="metric-label">En Revisión Manual</span>
+          <span class="metric-value" id="metric-review" style="color: var(--secondary);">0</span>
+          <span class="metric-desc">Discordancia OCR o en Fase 2</span>
         </div>
 
         <div class="metric-card metric-warning">
-          <span class="metric-label">Filtrados / Rechazados</span>
+          <span class="metric-label">Descartados Técnicos</span>
           <span class="metric-value" id="metric-rejected">0</span>
-          <span class="metric-desc">No cumplen requisitos</span>
+          <span class="metric-desc">No cumplen ECF / Test &lt; 80%</span>
         </div>
 
         <div class="metric-card metric-highlight">
-          <span class="metric-label">Ahorro Económico Estimado</span>
+          <span class="metric-label">Ahorro en Rechazos de Faena</span>
           <span class="metric-value" id="metric-savings">$0 CLP</span>
-          <span class="metric-desc">Gasto hundido evitado por rotación</span>
+          <span class="metric-desc">Gasto hundido evitado en acreditación</span>
         </div>
       </section>
 
       <!-- Filtros y Tabla -->
       <section class="card admin-card">
         <div class="table-header-tools">
-          <h2>👥 Postulaciones Recibidas</h2>
+          <h2>Tubería de Postulantes (State Machine)</h2>
           
           <div class="filters-bar">
             <div class="filter-group">
-              <label for="filter-position">Cargo:</label>
+              <label for="filter-position">Especialidad:</label>
               <select id="filter-position">
-                <option value="">Todos los cargos</option>
+                <option value="">Todas las especialidades</option>
               </select>
             </div>
 
             <div class="filter-group">
-              <label for="filter-status">Estado:</label>
+              <label for="filter-status">Estado (State Machine):</label>
               <select id="filter-status">
                 <option value="">Todos los estados</option>
-                <option value="Pendiente">Pendientes</option>
-                <option value="Aprobado">Aprobados</option>
-                <option value="Rechazado">Rechazados</option>
+                <option value="PRE_ACREDITADO">PRE_ACREDITADO (Listo WebControl)</option>
+                <option value="EN_REVISION_MANUAL">EN_REVISION_MANUAL (Auditar OCR)</option>
+                <option value="PRESELECCIONADO">PRESELECCIONADO (Esperando Fase 2)</option>
+                <option value="CONTRATADO_FAENA">CONTRATADO_FAENA (En Nómina)</option>
+                <option value="DESCARTADO_TECNICO">DESCARTADO_TECNICO (Filtro Fase 1)</option>
               </select>
             </div>
 
-            <button class="btn btn-secondary" id="btn-refresh">🔄 Actualizar</button>
+            <button class="btn btn-secondary" id="btn-refresh">Actualizar</button>
           </div>
         </div>
 
@@ -89,15 +97,15 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Candidato</th>
+                <th>Folio</th>
+                <th>Postulante</th>
                 <th>RUT</th>
-                <th>Edad</th>
-                <th>Cargo</th>
-                <th>Prueba Técnica</th>
-                <th>Audio & Biometría</th>
-                <th>Estado</th>
-                <th>Acción</th>
+                <th>Exp.</th>
+                <th>Especialidad (ECF)</th>
+                <th>Mini-Test</th>
+                <th>Validación Cruzada OCR</th>
+                <th>Estado (State Machine)</th>
+                <th>Acciones / WebControl</th>
               </tr>
             </thead>
             <tbody id="candidates-tbody">
@@ -110,11 +118,11 @@
       </section>
     </main>
 
-    <!-- Modal Detalle Candidato -->
+    <!-- Modal Detalle y Auditoría Cruzada -->
     <div class="modal-backdrop" id="modal-candidate" style="display:none;">
       <div class="modal-box">
         <button type="button" class="modal-close" id="btn-close-modal">&times;</button>
-        <h2 id="modal-title">Detalle del Candidato</h2>
+        <h2 id="modal-title">Expediente del Postulante</h2>
 
         <div class="modal-content-grid" id="modal-body">
           <!-- Detalle inyectado por JS -->

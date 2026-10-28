@@ -6,7 +6,7 @@
   <title>Panel RR.HH. & Exportación WebControl - Nexxo S.A.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
     <header class="top-nav">
       <div class="brand">
         <span class="company-logo">NEXXO S.A.</span>
-        <span class="group-tag">RR.HH. & Pre-Acreditación División El Teniente (WebControl)</span>
+        <span class="group-tag">Terminal RR.HH. & Pre-Acreditación División El Teniente (WebControl)</span>
       </div>
       <div class="nav-links">
         <a href="index.html" class="nav-link">Portal Convocatoria</a>
@@ -26,48 +26,49 @@
     <main class="main-container full-width">
       <!-- Header del Panel -->
       <section class="portal-header">
-        <span class="mining-tag">Fase 4: Consolidación de Nómina & Exportación WebControl (Codelco)</span>
-        <h1>Gestión de Pre-Acreditación y Validación Cruzada OCR</h1>
-        <p class="subtitle">Supervisión por excepción: RR.HH. solo interviene en casos <code>EN_REVISION_MANUAL</code> y exporta con un clic las carpetas <code>PRE_ACREDITADO</code> para paradas de planta.</p>
+        <span class="mining-tag">FASE 04: AUDITORÍA NORMATIVA & MATRIZ WEBCONTROL (CODELCO)</span>
+        <h1>MATRIZ DE AUDITORÍA TÉCNICA & VALIDACIÓN CRUZADA OCR</h1>
+        <p class="subtitle">Supervisión técnica por excepción: RR.HH. audita discrepancias en expedientes <code>EN_REVISION_MANUAL</code> y exporta carpetas técnicas conformes para ingreso a faena minera bajo estándar ECF Codelco y DS N° 132.</p>
       </section>
 
-      <!-- Métricas de Impacto Operativo y Económico -->
+      <!-- Métricas de Impacto Operativo y Económico (Instrumentación Industrial) -->
       <section class="metrics-grid">
         <div class="metric-card">
-          <span class="metric-label">Total Postulaciones</span>
+          <span class="metric-label">TOTAL POSTULACIONES</span>
           <span class="metric-value" id="metric-total">0</span>
-          <span class="metric-desc">Procesadas por el motor OCR</span>
+          <span class="metric-desc">Expedientes procesados por OCR</span>
         </div>
 
         <div class="metric-card metric-success">
-          <span class="metric-label">Pre-Acreditados / Nómina</span>
+          <span class="metric-label">PRE-ACREDITADOS / NÓMINA</span>
           <span class="metric-value" id="metric-approved">0</span>
-          <span class="metric-desc">Listos para exportar a WebControl</span>
+          <span class="metric-desc">Conformes para exportación WebControl</span>
         </div>
 
         <div class="metric-card">
-          <span class="metric-label">En Revisión Manual</span>
-          <span class="metric-value" id="metric-review" style="color: var(--secondary);">0</span>
-          <span class="metric-desc">Discordancia OCR o en Fase 2</span>
+          <span class="metric-label">EN REVISIÓN MANUAL</span>
+          <span class="metric-value" id="metric-review" style="color: var(--safety-yellow);">0</span>
+          <span class="metric-desc">Auditoría requerida (Discordancia / Edición)</span>
         </div>
 
         <div class="metric-card metric-warning">
-          <span class="metric-label">Descartados Técnicos</span>
+          <span class="metric-label">DESCARTADOS TÉCNICOS</span>
           <span class="metric-value" id="metric-rejected">0</span>
-          <span class="metric-desc">No cumplen ECF / Test &lt; 80%</span>
+          <span class="metric-desc">No conformes con ECF / Test &lt; 80%</span>
         </div>
 
         <div class="metric-card metric-highlight">
-          <span class="metric-label">Ahorro en Rechazos de Faena</span>
+          <span class="metric-label">GASTO HUNDIDO EVITADO</span>
           <span class="metric-value" id="metric-savings">$0 CLP</span>
-          <span class="metric-desc">Gasto hundido evitado en acreditación</span>
+          <span class="metric-desc">Ahorro en acreditaciones fallidas</span>
         </div>
       </section>
 
-      <!-- Filtros y Tabla -->
+      <!-- Filtros y Matriz de Auditoría -->
       <section class="card admin-card">
+        <span class="terminal-phase-badge">[MATRIZ SCADA DE POSTULACIONES // ESTADOS EN TIEMPO REAL]</span>
         <div class="table-header-tools">
-          <h2>Tubería de Postulantes (State Machine)</h2>
+          <h2>TUBERÍA DE POSTULANTES (STATE MACHINE)</h2>
           
           <div class="filters-bar">
             <div class="filter-group">
@@ -78,39 +79,40 @@
             </div>
 
             <div class="filter-group">
-              <label for="filter-status">Estado (State Machine):</label>
+              <label for="filter-status">Estado:</label>
               <select id="filter-status">
                 <option value="">Todos los estados</option>
                 <option value="PRE_ACREDITADO">PRE_ACREDITADO (Listo WebControl)</option>
                 <option value="EN_REVISION_MANUAL">EN_REVISION_MANUAL (Auditar OCR)</option>
                 <option value="PRESELECCIONADO">PRESELECCIONADO (Esperando Fase 2)</option>
                 <option value="CONTRATADO_FAENA">CONTRATADO_FAENA (En Nómina)</option>
-                <option value="DESCARTADO_TECNICO">DESCARTADO_TECNICO (Filtro Fase 1)</option>
+                <option value="DESCARTADO_TECNICO">DESCARTADO_TECNICO (Filtro ECF)</option>
               </select>
             </div>
 
-            <button class="btn btn-secondary" id="btn-refresh">Actualizar</button>
+            <button class="btn btn-secondary" id="btn-refresh">Actualizar Matriz</button>
           </div>
         </div>
 
+        <!-- Tabla Densa con Visualización Tipo Matriz -->
         <div class="table-container">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Folio</th>
-                <th>Postulante</th>
+                <th>FOLIO</th>
+                <th>POSTULANTE</th>
                 <th>RUT</th>
-                <th>Exp.</th>
-                <th>Especialidad (ECF)</th>
-                <th>Mini-Test</th>
-                <th>Validación Cruzada OCR</th>
-                <th>Estado (State Machine)</th>
-                <th>Acciones / WebControl</th>
+                <th>EXP. EFECTIVA</th>
+                <th>ESPECIALIDAD (ECF)</th>
+                <th>MINI-TEST</th>
+                <th>CRUCE OCR / BIOMETRÍA</th>
+                <th>ESTADO NORMATIVO</th>
+                <th>OPERACIÓN / WEBCONTROL</th>
               </tr>
             </thead>
             <tbody id="candidates-tbody">
               <tr>
-                <td colspan="9" class="loading-td">Cargando postulaciones desde MySQL...</td>
+                <td colspan="9" class="loading-td">Cargando matriz de postulaciones desde MySQL...</td>
               </tr>
             </tbody>
           </table>
@@ -122,6 +124,7 @@
     <div class="modal-backdrop" id="modal-candidate" style="display:none;">
       <div class="modal-box">
         <button type="button" class="modal-close" id="btn-close-modal">&times;</button>
+        <span class="terminal-phase-badge">[EXPEDIENTE TÉCNICO INDIVIDUAL]</span>
         <h2 id="modal-title">Expediente del Postulante</h2>
 
         <div class="modal-content-grid" id="modal-body">

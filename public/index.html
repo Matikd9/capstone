@@ -6,7 +6,7 @@
   <title>Portal de Convocatoria y Pre-Filtro Normativo - Nexxo S.A.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,79 +26,153 @@
     <main class="main-container">
       <!-- Encabezado del Portal -->
       <section class="portal-header">
-        <span class="mining-tag">Portal de Convocatoria Especializada & Pre-Filtro Normativo de Faena</span>
+        <span class="mining-tag">Terminal de Convocatoria Especializada & Pre-Filtro Normativo de Faena</span>
         <h1>Postulación a Paradas de Planta & Mantenimiento</h1>
-        <p class="subtitle">Validación progresiva conforme a Estándares de Control de Fatalidades (ECF Codelco), DS N° 132 SERNAGEOMIN y normativa de la Dirección del Trabajo.</p>
+        <p class="subtitle">Validación técnica y documental progresiva conforme a Estándares de Control de Fatalidades (ECF Codelco), DS N° 132 SERNAGEOMIN y Ley N° 19.628.</p>
       </section>
 
       <!-- Indicador de Fases del Funnel -->
       <div class="wizard-steps">
         <div class="step-item active" id="step-nav-1">
-          <span class="step-num">1</span>
-          <span class="step-text">Fase 1: Filtro Curricular & ECF</span>
+          <span class="step-num">01</span>
+          <span class="step-text">FASE 01: EXTRACCIÓN OCR</span>
         </div>
         <div class="step-divider"></div>
         <div class="step-item" id="step-nav-2">
-          <span class="step-num">1.5</span>
-          <span class="step-text">Mini-Test Técnico + Proctoring</span>
+          <span class="step-num">01.5</span>
+          <span class="step-text">FASE 01.5: CERTIFICACIÓN TÉCNICA</span>
         </div>
         <div class="step-divider"></div>
         <div class="step-item" id="step-nav-3">
-          <span class="step-num">2</span>
-          <span class="step-text">Fase 2: Pre-Acreditación Faena</span>
+          <span class="step-num">02</span>
+          <span class="step-text">FASE 02: VALIDACIÓN DOCUMENTAL</span>
         </div>
       </div>
 
       <!-- ====================================================================
-           FASE 1: CONVOCATORIA ABIERTA Y FILTRO CURRICULAR / CREDENCIAL TÉCNICA
-           (Sin pedir Carnet ni Antecedentes Penales de entrada)
+           FASE 01: EXTRACCIÓN OCR Y FILTRO CURRICULAR / CREDENCIAL TÉCNICA
            ==================================================================== -->
       <div class="step-card" id="wizard-step-1">
-        <h2>Fase 1: Filtro de Entrada Rápido (CV + Credencial Técnica)</h2>
-        <p class="section-desc">Seleccione su especialidad y suba su CV y Credencial Técnica Habilitante. Nuestro motor OCR extraerá sus datos automáticamente para que solo tenga que revisarlos o corregirlos.</p>
+        <span class="terminal-phase-badge">[MÓDULO DE ACCESO: FASE 01 // SISTEMA OCR]</span>
+        <h2>FASE 01: EXTRACCIÓN OCR & FILTRO CURRICULAR ECF</h2>
+        <p class="section-desc">Seleccione su especialidad operativa y cargue su Credencial Técnica Habilitante y CV. El motor OCR local procesará la información en tiempo real para poblar la matriz de pre-calificación.</p>
 
         <form id="form-step-1" class="custom-form">
           <!-- Selección de Cargo -->
           <div class="field-group">
-            <label for="position_id">1. Especialidad / Cargo para Parada de Planta *</label>
+            <label for="position_id">1. Especialidad / Cargo Operativo Minero *</label>
             <select id="position_id" required>
               <option value="">Cargando especialidades disponibles...</option>
             </select>
             <span class="field-hint" id="ecf-requirement-hint">Seleccione un cargo para ver la credencial técnica exigida por el ECF de Codelco.</span>
           </div>
 
-          <!-- Carga de Documentos de Fase 1 (100% Legal en Postulación Abierta) -->
+          <!-- Zona de Carga de Documentos con Apariencia de Escáner Técnico -->
           <div class="docs-section">
             <div class="doc-box" id="box-credencial">
               <label for="file-credencial" id="label-credencial">Credencial / Certificación Técnica Habilitante *</label>
-              <input type="file" id="file-credencial" accept="image/*,.pdf" class="file-input" required>
-              <span class="file-status" id="credencial-status">Subir foto o imagen de su Carnet Rigger, Calificación WPQ o Licencia Clase D</span>
+              
+              <div class="industrial-dropzone" id="dropzone-credencial" data-input-id="file-credencial">
+                <input type="file" id="file-credencial" accept="image/*,.pdf" class="visually-hidden" required>
+                <div class="dropzone-empty">
+                  <svg class="dropzone-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                    <path d="M12 12v9"></path>
+                    <path d="m16 16-4-4-4 4"></path>
+                  </svg>
+                  <div class="dropzone-main-text">[ ARRASTRE EL ARCHIVO O HAGA CLIC AQUÍ ]</div>
+                  <div class="dropzone-subtext">Formatos permitidos: PDF, JPG, PNG (Máx. 10MB)</div>
+                </div>
+                <div class="dropzone-loaded" style="display:none;">
+                  <svg class="dropzone-icon dropzone-icon-loaded" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <path d="m9 15 2 2 4-4"></path>
+                  </svg>
+                  <div class="dropzone-file-name" id="dropzone-name-credencial"></div>
+                  <div class="dropzone-file-meta" id="dropzone-meta-credencial"></div>
+                  <div class="dropzone-actions">
+                    <button type="button" class="btn-dropzone-action btn-replace">[REEMPLAZAR]</button>
+                    <button type="button" class="btn-dropzone-action btn-remove">[ELIMINAR]</button>
+                  </div>
+                </div>
+                <div class="dropzone-error-msg" style="display:none;"></div>
+              </div>
+
+              <span class="file-status" id="credencial-status">[ESCANEO ACTIVO: Carnet Rigger, WPQ o Licencia D]</span>
             </div>
 
             <div class="doc-box" id="box-cv">
-              <label for="file-cv">Currículum Vitae (CV Actualizado) *</label>
-              <input type="file" id="file-cv" accept="image/*,.pdf" class="file-input" required>
-              <span class="file-status" id="cv-status">Subir CV en imagen o PDF (Extrae experiencia y contacto)</span>
+              <label for="file-cv">Currículum Vitae (CV Técnico) *</label>
+              
+              <div class="industrial-dropzone" id="dropzone-cv" data-input-id="file-cv">
+                <input type="file" id="file-cv" accept="image/*,.pdf" class="visually-hidden" required>
+                <div class="dropzone-empty">
+                  <svg class="dropzone-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                    <path d="M12 12v9"></path>
+                    <path d="m16 16-4-4-4 4"></path>
+                  </svg>
+                  <div class="dropzone-main-text">[ ARRASTRE EL ARCHIVO O HAGA CLIC AQUÍ ]</div>
+                  <div class="dropzone-subtext">Formatos permitidos: PDF, JPG, PNG (Máx. 10MB)</div>
+                </div>
+                <div class="dropzone-loaded" style="display:none;">
+                  <svg class="dropzone-icon dropzone-icon-loaded" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <path d="m9 15 2 2 4-4"></path>
+                  </svg>
+                  <div class="dropzone-file-name" id="dropzone-name-cv"></div>
+                  <div class="dropzone-file-meta" id="dropzone-meta-cv"></div>
+                  <div class="dropzone-actions">
+                    <button type="button" class="btn-dropzone-action btn-replace">[REEMPLAZAR]</button>
+                    <button type="button" class="btn-dropzone-action btn-remove">[ELIMINAR]</button>
+                  </div>
+                </div>
+                <div class="dropzone-error-msg" style="display:none;"></div>
+              </div>
+
+              <span class="file-status" id="cv-status">[ESCANEO ACTIVO: CV en PDF o Imagen (Contacto y Fechas)]</span>
             </div>
           </div>
 
           <!-- Estado de Procesamiento OCR de Fase 1 -->
           <div id="ocr-live-banner" class="ocr-banner" style="display:none;">
             <strong id="ocr-live-icon" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">[OCR]</strong>
-            <span id="ocr-live-text">Analizando documentos con OCR local (Tesseract.js)...</span>
+            <span id="ocr-live-text">Analizando documentos con OCR local (Tesseract / Poppler)...</span>
           </div>
 
-          <!-- Campos Autocompletados por OCR (Desplegados al subir documento, editables por el postulante) -->
+          <!-- Campos Autocompletados por OCR con Telemetría en Tiempo Real -->
           <div id="ocr-fields-container" class="ocr-autofill-panel" style="display:none;">
             <div class="ocr-autofill-header">
               <div>
-                <h3>Datos Extraídos por OCR (Revise o Corrija si es necesario)</h3>
-                <p class="field-hint">Si el OCR omitió o leyó mal algún dato de su documento, puede escribirlo o corregirlo directamente en los campos.</p>
+                <h3>Telemetría de Datos Parseados por OCR</h3>
+                <p class="field-hint">Verifique los datos estructurados por el motor. Puede corregir cualquier valor directamente en los campos inferiores.</p>
               </div>
-              <span class="status-pill status-Aprobado" id="ocr-badge-indicator">Autocompletado OCR</span>
+              <span class="status-pill status-Aprobado" id="ocr-badge-indicator">OCR PROCESADO</span>
             </div>
 
-            <div class="form-grid" style="margin-top: 1rem;">
+            <!-- Bloques en Tiempo Real de Datos Parseados (Comuna, RUT, Meses de Experiencia) -->
+            <div class="ocr-telemetry-readout" id="ocr-telemetry-strip">
+              <div class="telemetry-cell">
+                <span class="telemetry-label">[RUT PARSEADO]</span>
+                <span class="telemetry-val" id="telemetry-rut">NO DETECTADO</span>
+              </div>
+              <div class="telemetry-cell">
+                <span class="telemetry-label">[COMUNA RESIDENCIA]</span>
+                <span class="telemetry-val" id="telemetry-city">NO ESPECIFICADA EN CV</span>
+              </div>
+              <div class="telemetry-cell">
+                <span class="telemetry-label">[EXP. EFECTIVA]</span>
+                <span class="telemetry-val" id="telemetry-exp">0 AÑOS (0 MESES)</span>
+              </div>
+              <div class="telemetry-cell">
+                <span class="telemetry-label">[ESTADO CRED.]</span>
+                <span class="telemetry-val" id="telemetry-cred">PENDIENTE</span>
+              </div>
+            </div>
+
+            <div class="form-grid">
               <div class="field-group">
                 <label for="full_name">Nombre Completo *</label>
                 <input type="text" id="full_name" placeholder="ej. Juan Carlos Pérez González" required>
@@ -106,15 +180,15 @@
               </div>
 
               <div class="field-group">
-                <label for="rut_id">RUT / RUN (Texto plano) *</label>
+                <label for="rut_id">RUT / RUN (Formato Nacional) *</label>
                 <input type="text" id="rut_id" placeholder="ej. 15.678.901-2" required>
-                <span class="field-hint" id="hint-rut">Se cruzará en Fase 2 con su Cédula si pre-clasifica</span>
+                <span class="field-hint" id="hint-rut">Validación Módulo 11 (Se cruzará en Fase 2 con su Cédula)</span>
               </div>
 
               <div class="field-group">
                 <label for="email">Correo Electrónico *</label>
                 <input type="email" id="email" placeholder="ej. jperez@correo.cl" required>
-                <span class="field-hint" id="hint-email">Para notificación de pre-acreditación</span>
+                <span class="field-hint" id="hint-email">Canal oficial de citación a faena</span>
               </div>
 
               <div class="field-group">
@@ -130,70 +204,88 @@
               </div>
 
               <div class="field-group">
-                <label for="experience_years">Años de Experiencia en Minería/Industria *</label>
+                <label for="experience_years">Años de Experiencia en Minería / Industria *</label>
                 <input type="number" id="experience_years" min="0" max="45" placeholder="ej. 4" required>
-                <span class="field-hint alert-hint" id="hint-exp">El ECF de Codelco exige experiencia mínima comprobable en el cargo.</span>
+                <span class="field-hint alert-hint" id="hint-exp">El ECF Codelco exige experiencia comprobable sin incluir prácticas.</span>
               </div>
             </div>
           </div>
 
-          <!-- Aviso y Consentimiento de Proctoring Transparente para Fase 1.5 -->
+          <!-- Módulo de Cámara Web Estilo Visor Técnico con Retícula de Encuadre -->
           <div class="camera-card">
-            <h3>Preparación de Cámara para Proctoring Transparente (Fase 1.5)</h3>
+            <h3>Módulo Óptico: Visor Técnico para Proctoring Transparente (Fase 1.5)</h3>
             <p class="camera-desc">
-              Para evitar suplantaciones en el Mini-Test Técnico, su cámara estará <strong>activa y visible en pantalla</strong> durante la prueba y tomará una <strong>Selfie de Validación Informada</strong> (sin capturas ocultas).
+              Para evitar suplantaciones en el Mini-Test Técnico, su cámara estará <strong>activa y visible en pantalla</strong> con retícula de encuadre. Se capturará una <strong>Selfie de Validación Informada</strong> conforme a la Ley N° 19.628 (sin capturas encubiertas).
             </p>
 
-            <div class="camera-wrapper">
+            <div class="camera-wrapper visor-technical">
+              <div class="visor-hud-overlay">
+                <div class="visor-reticle-corner top-left"></div>
+                <div class="visor-reticle-corner top-right"></div>
+                <div class="visor-reticle-corner bottom-left"></div>
+                <div class="visor-reticle-corner bottom-right"></div>
+                <div class="visor-crosshair"></div>
+                <div class="visor-hud-tag top">[VISOR TÉCNICO // ENCUADRE ROSTRO]</div>
+                <div class="visor-hud-tag bottom">[720P OPTICAL HUD // PROCTORING LEY 19.628]</div>
+              </div>
               <video id="webcam-view" autoplay playsinline muted></video>
               <canvas id="photo-canvas" style="display:none;"></canvas>
               <img id="selfie-preview" style="display:none;" alt="Selfie de Validación">
             </div>
 
             <div class="camera-actions">
-              <button type="button" class="btn btn-secondary" id="btn-start-camera">Activar Cámara Visible</button>
+              <button type="button" class="btn btn-secondary" id="btn-start-camera">Activar Visor en Pantalla</button>
               <button type="button" class="btn btn-camera" id="btn-take-selfie" disabled>Capturar Selfie de Validación</button>
             </div>
 
             <label class="consent-checkbox-box" style="margin-top: 1rem;">
               <input type="checkbox" id="consent-proctoring" required>
               <span>
-                <strong>Consentimiento de Proctoring Transparente:</strong> Acepto que mi cámara permanezca visible durante el Mini-Test Técnico y que mi fotografía de validación sea contrastada posteriormente con mi Cédula de Identidad en caso de pasar a la etapa de Pre-Acreditación.
+                <strong>Consentimiento de Proctoring Transparente:</strong> Acepto que mi cámara permanezca visible durante el Mini-Test Técnico y que mi fotografía de validación sea contrastada con mi Cédula de Identidad en la etapa de Pre-Acreditación.
               </span>
             </label>
           </div>
 
           <div class="action-bar">
             <button type="submit" class="btn btn-primary btn-large" id="btn-step1-submit">
-              <span>Avanzar a Fase 1.5: Mini-Test Técnico (Umbral &ge; 80%)</span>
+              <span>Avanzar a FASE 01.5: CERTIFICACIÓN TÉCNICA (Umbral &ge; 80%)</span>
             </button>
           </div>
         </form>
       </div>
 
       <!-- ====================================================================
-           FASE 1.5: MINI-TEST TÉCNICO (5 PREGUNTAS) + PROCTORING TRANSPARENTE
+           FASE 01.5: MINI-TEST TÉCNICO + PROCTORING TRANSPARENTE
            ==================================================================== -->
       <div class="step-card" id="wizard-step-2" style="display:none;">
+        <span class="terminal-phase-badge">[MÓDULO DE EVALUACIÓN: FASE 01.5]</span>
         <div class="quiz-header">
           <div>
-            <h2>Fase 1.5: Mini-Test Técnico de Idoneidad (ECF Codelco)</h2>
-            <p class="section-desc">Responda las 5 preguntas técnicas de su especialidad. Requiere al menos <strong>80% (4 de 5 aciertos)</strong> para desbloquear la Pre-Acreditación de Faena.</p>
+            <h2>FASE 01.5: CERTIFICACIÓN TÉCNICA (MINI-TEST ECF CODELCO)</h2>
+            <p class="section-desc">Enfoque sin distracciones. Responda las 5 preguntas técnicas de su especialidad. Requiere al menos <strong>80% (4 de 5 aciertos)</strong> para desbloquear la Pre-Acreditación de Faena.</p>
           </div>
-          <div class="timer-badge">
-            <span class="timer-icon">Tiempo:</span>
-            <span id="quiz-timer">40s</span>
+          <!-- Cronómetro en Monoespaciado Grande -->
+          <div class="timer-terminal">
+            <span class="timer-label">CRONÓMETRO:</span>
+            <span id="quiz-timer" class="timer-mono">40s</span>
           </div>
         </div>
 
-        <!-- Barra de Proctoring Transparente (Visible para el postulante en todo momento) -->
+        <!-- Barra de Proctoring Transparente con Visor HUD -->
         <div class="proctoring-visible-bar">
-          <div class="proctoring-video-box">
+          <div class="proctoring-video-box visor-technical-sm">
+            <div class="visor-hud-overlay">
+              <div class="visor-reticle-corner top-left"></div>
+              <div class="visor-reticle-corner top-right"></div>
+              <div class="visor-reticle-corner bottom-left"></div>
+              <div class="visor-reticle-corner bottom-right"></div>
+              <div class="visor-crosshair-sm"></div>
+            </div>
             <video id="proctoring-live-video" autoplay playsinline muted></video>
           </div>
           <div class="proctoring-info">
             <span class="status-pill status-Aprobado">Proctoring Transparente Activo</span>
-            <p>Tu cámara está activa de forma visible para validar tu identidad durante la prueba teórica conforme a tu consentimiento informado.</p>
+            <p>Su cámara permanece visible durante el examen para garantizar que la prueba sea rendida por el titular conforme a su consentimiento informado.</p>
           </div>
         </div>
 
@@ -201,7 +293,7 @@
           <div class="question-progress">
             Pregunta <span id="q-current">1</span> de <span id="q-total">5</span>
           </div>
-          <h3 class="question-title" id="question-text">Cargando pregunta...</h3>
+          <h3 class="question-title" id="question-text">Cargando reactivo técnico...</h3>
 
           <div class="options-grid" id="options-container">
             <!-- Opciones generadas por JS -->
@@ -210,41 +302,117 @@
 
         <div class="action-bar">
           <button type="button" class="btn btn-primary btn-large" id="btn-next-question">
-            <span>Confirmar Respuesta y Siguiente</span>
+            <span>Confirmar Respuesta y Avanzar</span>
           </button>
         </div>
       </div>
 
       <!-- ====================================================================
-           FASE 2 & 3: PRE-ACREDITACIÓN FORMAL (SOLO PARA PRESELECCIONADOS)
+           FASE 02: VALIDACIÓN DOCUMENTAL (SOLO PARA PRESELECCIONADOS)
            ==================================================================== -->
       <div class="step-card" id="wizard-step-3" style="display:none;">
+        <span class="terminal-phase-badge">[MÓDULO DE PRE-ACREDITACIÓN: FASE 02]</span>
         <div class="prequalified-banner">
-          <span class="status-pill status-Aprobado">ESTADO: PRESELECCIONADO TÉCNICAMENTE</span>
-          <h2 style="margin-top: 0.5rem;">Has calificado técnicamente para la convocatoria de División El Teniente</h2>
+          <span class="status-pill status-Aprobado">[AUTORIZACIÓN DE FAENA CONFORME]</span>
+          <h2 style="margin-top: 0.5rem;">Pre-Acreditación Normativa para División El Teniente</h2>
           <p>
-            Obtuviste <strong id="phase1-score-badge">100%</strong> en el filtro técnico. Para avanzar a la nómina de <strong>Pre-Acreditación (WebControl Codelco)</strong> y examen preocupacional, requerimos validar tu identidad y antecedentes de faena.
+            Su cupo ha sido formalmente autorizado por el equipo de Reclutamiento y Acreditación de Nexxo S.A. <span id="phase1-score-badge"></span>. Para conformar su Carpeta de Acreditación oficial (<strong>WebControl Codelco / SICEP</strong>), ingrese su Cédula de Identidad y Certificado de Antecedentes para Fines Especiales (Vigencia &le; 60 días).
           </p>
         </div>
 
         <form id="form-phase2" class="custom-form" style="margin-top: 1.5rem;">
           <div class="docs-section docs-three-cols">
-            <div class="doc-box">
+            <div class="doc-box" id="box-carnet-front">
               <label for="file-carnet-front">Cédula de Identidad (Frente) *</label>
-              <input type="file" id="file-carnet-front" accept="image/*" class="file-input" required>
-              <span class="file-status" id="carnet-front-status">Subir foto frontal clara (Valida RUT, Nombre y Vigencia)</span>
+              <div class="industrial-dropzone" id="dropzone-carnet-front" data-input-id="file-carnet-front">
+                <input type="file" id="file-carnet-front" accept="image/*,.pdf" class="visually-hidden" required>
+                <div class="dropzone-empty">
+                  <svg class="dropzone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                    <path d="M12 12v9"></path>
+                    <path d="m16 16-4-4-4 4"></path>
+                  </svg>
+                  <div class="dropzone-main-text">[ ARRASTRE O HAGA CLIC ]</div>
+                  <div class="dropzone-subtext">PDF, JPG, PNG (Máx. 10MB)</div>
+                </div>
+                <div class="dropzone-loaded" style="display:none;">
+                  <svg class="dropzone-icon dropzone-icon-loaded" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <path d="m9 15 2 2 4-4"></path>
+                  </svg>
+                  <div class="dropzone-file-name" id="dropzone-name-carnet-front"></div>
+                  <div class="dropzone-file-meta" id="dropzone-meta-carnet-front"></div>
+                  <div class="dropzone-actions">
+                    <button type="button" class="btn-dropzone-action btn-replace">[REEMPLAZAR]</button>
+                    <button type="button" class="btn-dropzone-action btn-remove">[ELIMINAR]</button>
+                  </div>
+                </div>
+                <div class="dropzone-error-msg" style="display:none;"></div>
+              </div>
+              <span class="file-status" id="carnet-front-status">[ESCANEO: Valida RUT, Nombre y Vigencia]</span>
             </div>
 
-            <div class="doc-box">
+            <div class="doc-box" id="box-carnet-back">
               <label for="file-carnet-back">Cédula de Identidad (Reverso)</label>
-              <input type="file" id="file-carnet-back" accept="image/*" class="file-input">
-              <span class="file-status" id="carnet-back-status">Opcional: Reverso de la cédula</span>
+              <div class="industrial-dropzone" id="dropzone-carnet-back" data-input-id="file-carnet-back">
+                <input type="file" id="file-carnet-back" accept="image/*,.pdf" class="visually-hidden">
+                <div class="dropzone-empty">
+                  <svg class="dropzone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                    <path d="M12 12v9"></path>
+                    <path d="m16 16-4-4-4 4"></path>
+                  </svg>
+                  <div class="dropzone-main-text">[ ARRASTRE O HAGA CLIC ]</div>
+                  <div class="dropzone-subtext">PDF, JPG, PNG (Máx. 10MB)</div>
+                </div>
+                <div class="dropzone-loaded" style="display:none;">
+                  <svg class="dropzone-icon dropzone-icon-loaded" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <path d="m9 15 2 2 4-4"></path>
+                  </svg>
+                  <div class="dropzone-file-name" id="dropzone-name-carnet-back"></div>
+                  <div class="dropzone-file-meta" id="dropzone-meta-carnet-back"></div>
+                  <div class="dropzone-actions">
+                    <button type="button" class="btn-dropzone-action btn-replace">[REEMPLAZAR]</button>
+                    <button type="button" class="btn-dropzone-action btn-remove">[ELIMINAR]</button>
+                  </div>
+                </div>
+                <div class="dropzone-error-msg" style="display:none;"></div>
+              </div>
+              <span class="file-status" id="carnet-back-status">[ESCANEO: Reverso del documento]</span>
             </div>
 
-            <div class="doc-box">
+            <div class="doc-box" id="box-antecedentes">
               <label for="file-antecedentes">Certificado de Antecedentes (Fines Especiales) *</label>
-              <input type="file" id="file-antecedentes" accept="image/*,.pdf" class="file-input" required>
-              <span class="file-status" id="antecedentes-status">Emitido por Registro Civil (Vigencia &le; 60 días)</span>
+              <div class="industrial-dropzone" id="dropzone-antecedentes" data-input-id="file-antecedentes">
+                <input type="file" id="file-antecedentes" accept="image/*,.pdf" class="visually-hidden" required>
+                <div class="dropzone-empty">
+                  <svg class="dropzone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                    <path d="M12 12v9"></path>
+                    <path d="m16 16-4-4-4 4"></path>
+                  </svg>
+                  <div class="dropzone-main-text">[ ARRASTRE O HAGA CLIC ]</div>
+                  <div class="dropzone-subtext">PDF, JPG, PNG (Máx. 10MB)</div>
+                </div>
+                <div class="dropzone-loaded" style="display:none;">
+                  <svg class="dropzone-icon dropzone-icon-loaded" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <path d="m9 15 2 2 4-4"></path>
+                  </svg>
+                  <div class="dropzone-file-name" id="dropzone-name-antecedentes"></div>
+                  <div class="dropzone-file-meta" id="dropzone-meta-antecedentes"></div>
+                  <div class="dropzone-actions">
+                    <button type="button" class="btn-dropzone-action btn-replace">[REEMPLAZAR]</button>
+                    <button type="button" class="btn-dropzone-action btn-remove">[ELIMINAR]</button>
+                  </div>
+                </div>
+                <div class="dropzone-error-msg" style="display:none;"></div>
+              </div>
+              <span class="file-status" id="antecedentes-status">[REGISTRO CIVIL: Vigencia &le; 60 días]</span>
             </div>
           </div>
 
@@ -265,14 +433,15 @@
       </div>
 
       <!-- ====================================================================
-           PANTALLA FINAL DE RESULTADO (PRE_ACREDITADO / EN_REVISION_MANUAL / DESCARTADO_TECNICO)
+           PANTALLA FINAL DE DICTAMEN TÉCNICO
            ==================================================================== -->
       <div class="step-card text-center" id="wizard-step-4" style="display:none;">
-        <div style="margin-bottom: 0.85rem;">
+        <span class="terminal-phase-badge">[DICTAMEN FINAL DEL SISTEMA]</span>
+        <div style="margin-bottom: 0.85rem; margin-top: 0.4rem;">
           <span class="status-pill status-Aprobado" id="final-icon">ESTADO: PROCESO FINALIZADO</span>
         </div>
-        <h2 id="final-title">Proceso Finalizado</h2>
-        <p class="section-desc" id="final-subtitle">Resumen del estado de su postulación en la Máquina de Estados de Nexxo S.A.</p>
+        <h2 id="final-title">Proceso de Postulación Concluido</h2>
+        <p class="section-desc" id="final-subtitle">Resumen del estado normativo de su postulación en la Máquina de Estados de Nexxo S.A.</p>
 
         <div class="result-box" id="result-summary">
           <!-- Detalle inyectado por JS -->

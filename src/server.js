@@ -6,6 +6,9 @@ const { execFileSync } = require('child_process');
 const { createWorker } = require('tesseract.js');
 require('dotenv').config();
 
+const geminiOcr = require('./geminiOcr');
+const mailer = require('./mailer');
+
 // Evitar que errores asíncronos internos de workers OCR tumben el proceso Node.js
 process.on('uncaughtException', (err) => {
   console.error('[Proceso - Excepción Capturada]:', err && err.message ? err.message : err);
@@ -47,6 +50,7 @@ const VALID_STATES = [
   'POSTULADO',
   'DESCARTADO_TECNICO',
   'PRESELECCIONADO',
+  'APROBADO_FAENA',
   'DOCS_CARGADOS',
   'EN_REVISION_MANUAL',
   'PRE_ACREDITADO',
@@ -126,6 +130,10 @@ async function initDB(retries = 10, delay = 3000) {
       try { await conn.query("ALTER TABLE candidates MODIFY COLUMN status VARCHAR(50) DEFAULT 'POSTULADO'"); } catch (e) {}
       try { await conn.query('ALTER TABLE candidates MODIFY COLUMN age INT DEFAULT 30'); } catch (e) {}
 
+      // Migraciones en questions para categoría SJT / TECNICA y posición opcional
+      try { await conn.query('ALTER TABLE questions MODIFY COLUMN position_id INT NULL'); } catch (e) {}
+      try { await conn.query("ALTER TABLE questions ADD COLUMN category VARCHAR(30) DEFAULT 'TECNICA'"); } catch (e) {}
+
       const positionMigrations = [
         'ALTER TABLE positions ADD COLUMN required_credential VARCHAR(150)',
         'ALTER TABLE positions ADD COLUMN min_experience_years INT DEFAULT 2',
@@ -158,7 +166,13 @@ async function initDB(retries = 10, delay = 3000) {
         'ALTER TABLE candidates ADD COLUMN ocr_edited_fields VARCHAR(255)',
         'ALTER TABLE candidates ADD COLUMN discrepancy_notes TEXT',
         'ALTER TABLE candidates ADD COLUMN consent_proctoring BOOLEAN DEFAULT FALSE',
-        'ALTER TABLE candidates ADD COLUMN consent_ley19628 BOOLEAN DEFAULT FALSE'
+        'ALTER TABLE candidates ADD COLUMN consent_ley19628 BOOLEAN DEFAULT FALSE',
+        'ALTER TABLE candidates ADD COLUMN score_tecnico INT DEFAULT 0',
+        'ALTER TABLE candidates ADD COLUMN score_sjt INT DEFAULT 0',
+        'ALTER TABLE candidates ADD COLUMN sjt_conforme BOOLEAN DEFAULT FALSE',
+        'ALTER TABLE candidates ADD COLUMN access_token VARCHAR(64) UNIQUE',
+        'ALTER TABLE candidates ADD COLUMN token_expires_at DATETIME',
+        'ALTER TABLE candidates ADD COLUMN token_used_at DATETIME'
       ];
       for (const sql of candidateMigrations) {
         try { await conn.query(sql); } catch (e) {}
@@ -230,7 +244,7 @@ async function ensureSeedData(conn) {
 
     console.log('[DB Seed] Banco de preguntas ECF poblado con éxito.');
   } else {
-    // Asegurar que los cargos existentes tengan metadata ECF y al menos 5 preguntas cada uno
+    // Asegurar metadata ECF y preguntas técnicas específicas para cada cargo
     const [positions] = await conn.query('SELECT * FROM positions ORDER BY id ASC');
     for (const p of positions) {
       if (!p.required_credential) {
@@ -252,49 +266,87 @@ async function ensureSeedData(conn) {
         }
       }
 
-      const [qCount] = await conn.query('SELECT COUNT(*) as c FROM questions WHERE position_id = ?', [p.id]);
-      if (qCount[0].c < 5) {
-        const type = /rigger/i.test(p.name) ? 'rigger' : (/soldador/i.test(p.name) ? 'soldador' : 'operador');
-        await insertQuestionsForPosition(conn, p.id, type);
-      }
+      const type = /rigger/i.test(p.name) ? 'rigger' : (/soldador/i.test(p.name) ? 'soldador' : 'operador');
+      await insertQuestionsForPosition(conn, p.id, type);
     }
+  }
+
+  // 2. Asegurar banco transversal de Juicio Situacional (SJT ECF / Paso Cero)
+  const [sjtRows] = await conn.query("SELECT COUNT(*) as c FROM questions WHERE category = 'SJT'");
+  if (sjtRows[0].c < 2) {
+    await conn.query(
+      `INSERT INTO questions (position_id, question_text, option_a, option_b, option_c, option_d, correct_option, category) VALUES
+      (NULL, 'El supervisor le pide ejecutar un izaje saltándose el check-list del ART porque el camión pluma debe abandonar la faena en 10 minutos. ¿Qué acción corresponde aplicar?', 'Ejecutar la maniobra rápido para no frenar la parada.', 'Aplicar el \\'Paso Cero\\' / Derecho a Decir NO, negándose a operar sin el ART completo y firmado', 'Pedir autorización verbal al operador de la grúa.', 'Llenar el documento después de terminar el izaje.', 'B', 'SJT'),
+      (NULL, 'Durante la maniobra, detecta que una de las patas estabilizadoras de la grúa cedió levemente en terreno blando no señalizado. ¿Cuál es la conducta inmediata?', 'Compensar con contrapesos y seguir.', 'Detener la maniobra al instante, asegurar la carga y dar aviso de la condición de falla', 'Apurar la descarga antes de que ceda más.', 'Ignorar si el inclinómetro de la cabina sigue en rango amarillo.', 'B', 'SJT')`
+    );
+    console.log('[DB Seed] Banco transversal de Juicio Situacional (SJT ECF) poblado.');
   }
 }
 
 async function insertQuestionsForPosition(conn, posId, type) {
+  const [existing] = await conn.query('SELECT id FROM questions WHERE position_id = ? ORDER BY id ASC', [posId]);
+  
+  let qList = [];
   if (type === 'rigger') {
-    await conn.query(
-      `INSERT INTO questions (position_id, question_text, option_a, option_b, option_c, option_d, correct_option) VALUES
-      (?, '¿Cuál es el ángulo de trabajo recomendado con respecto a la horizontal para una maniobra con eslingas de dos ramales para evitar sobrecargas críticas?', 'Entre 45° y 60°', '90° exactos en todo momento', 'Menor a 30° siempre', 'Mayor a 120°', 'A'),
-      (?, 'Según el ECF N° 7 de Codelco, si un grillete o estrobo presenta un desgaste superior al 10% o deformación en su cuerpo, ¿qué acción corresponde?', 'Pintarlo para identificarlo', 'Darlo de baja e inutilizarlo de inmediato', 'Usarlo solo para cargas menores a 1 tonelada', 'Lubricar el pasador con grasa', 'B'),
-      (?, 'En señales manuales estandarizadas (ASME B30.5), ¿qué significa extender el brazo horizontalmente con el puño cerrado y el pulgar apuntando hacia arriba?', 'Subir la pluma de la grúa', 'Bajar la pluma', 'Parada de emergencia', 'Extender pluma telescópica', 'A'),
-      (?, '¿Qué elemento es obligatorio utilizar para guiar y controlar el giro o balanceo de una carga suspendida sin exponerse bajo la línea de fuego?', 'Cuerda guía (viento) de largo adecuado', 'Empujar la carga directamente con las manos usando guantes', 'Cadena secundaria al gancho', 'Cinta de confinamiento perimetral', 'A'),
-      (?, 'Si la velocidad del viento en terreno supera el límite máximo permitido por el fabricante de la grúa o el procedimiento de izaje (ej. > 32 km/h), ¿qué debe hacer el Rigger?', 'Acelerar la maniobra para terminar rápido', 'Suspender de inmediato la maniobra de izaje y asegurar la carga en piso', 'Agregar un tercer estrobo de respaldo', 'Bajar la carga a 1 metro del suelo y continuar', 'B'),
-      (?, 'Al leer la tabla de carga de una grúa móvil, si se incrementa el radio de operación (distancia horizontal desde el eje de giro hasta la carga), ¿qué ocurre con la capacidad bruta de levante?', 'Disminuye la capacidad de carga de la grúa', 'Aumenta proporcionalmente', 'Se mantiene constante si la pluma no cambia de largo', 'Depende únicamente del tipo de eslinga', 'A')`,
-      [posId, posId, posId, posId, posId, posId]
-    );
+    qList = [
+      {
+        text: '¿Cuál es el ángulo mínimo recomendado entre las eslingas y la horizontal en una maniobra de izaje estándar?',
+        a: '30°', b: '45°', c: '60°', d: '15°', correct: 'C'
+      },
+      {
+        text: 'Al inspeccionar una eslinga sintética antes del izaje, ¿qué defecto obliga a descartarla de inmediato según norma ASME B30.9?',
+        a: 'Pérdida de etiqueta de capacidad o corte visible', b: 'Suciedad superficial', c: 'Decoloración por luz solar', d: 'Costura doble en el ojo', correct: 'A'
+      },
+      {
+        text: '¿Qué elemento es mandatorio para guiar una carga suspendida cerca de estructuras en parada de planta?',
+        a: 'Guantes de cuero', b: 'Vientos (cuerdas guía) de longitud adecuada', c: 'Señalero sin radio', d: 'Apoyo manual directo', correct: 'B'
+      }
+    ];
   } else if (type === 'soldador') {
-    await conn.query(
-      `INSERT INTO questions (position_id, question_text, option_a, option_b, option_c, option_d, correct_option) VALUES
-      (?, 'En soldadura MIG/MAG (GMAW) para reparación estructural pesada, ¿cuál es la función principal del gas de protección (mezcla Ar/CO2)?', 'Enfriar rápidamente el metal base', 'Proteger el baño de fusión contra la contaminación atmosférica (oxígeno/nitrógeno)', 'Incrementar la tensión del arco eléctrico', 'Desprender la escoria gruesa del cordón', 'B'),
-      (?, 'Según estándares de seguridad en faena minera (ECF N° 6), antes de iniciar soldadura u oxicorte fuera de un taller habilitado, ¿qué documento es obligatorio y excluyente?', 'Permiso de Trabajo en Caliente (PTC) autorizado + medición de gases inflamables (LEL 0%)', 'Solo el registro de asistencia del turno', 'Orden de compra del electrodo', 'Certificado de estudios medios', 'A'),
-      (?, 'En calificación de soldadores bajo código AWS D1.1 / ASME IX, ¿qué posición de soldadura representa la sigla "4G" en plancha?', 'Posición plana', 'Posición horizontal', 'Posición sobrecabeza (techo)', 'Posición vertical ascendente', 'C'),
-      (?, 'Si al soldar acero estructural de gran espesor con proceso SMAW (electrodo E7018 de bajo hidrógeno) aparece porosidad agrupada al inicio del cordón, ¿cuál es la causa técnica más probable?', 'Revestimiento del electrodo con humedad por falta de horno de mantención o contaminación superficial', 'Exceso de precalentamiento controlado', 'Uso de corriente continua polaridad invertida (DCEP)', 'Limpieza excesiva del bisel con esmeril', 'A'),
-      (?, '¿Cuál es el propósito técnico de realizar precalentamiento controlado en aceros de alta resistencia o alto carbono (ej. planchas antidesgaste de chutes o baldes) antes de soldar?', 'Ahorrar consumo de electrodos', 'Disminuir la velocidad de enfriamiento para evitar fisuración inducida por hidrógeno en la ZAC', 'Eliminar la necesidad de limpieza mecánica', 'Aumentar la deformación térmica de la pieza', 'B'),
-      (?, 'En equipos de oxicorte, ¿qué dispositivo de seguridad es indispensable instalar en los reguladores y soplete para evitar el retroceso de llama hacia los cilindros?', 'Válvulas antirretorno y arrestallamas certificados', 'Manómetro de plástico simple', 'Abrazaderas de alambre galvanizado', 'Filtro decantador de agua', 'A')`,
-      [posId, posId, posId, posId, posId, posId]
-    );
+    qList = [
+      {
+        text: 'En soldadura MIG/MAG (GMAW) para reparación estructural pesada, ¿cuál es la función principal del gas de protección (mezcla Ar/CO2)?',
+        a: 'Enfriar rápidamente el metal base', b: 'Proteger el baño de fusión contra la contaminación atmosférica (oxígeno/nitrógeno)', c: 'Incrementar la tensión del arco eléctrico', d: 'Desprender la escoria gruesa del cordón', correct: 'B'
+      },
+      {
+        text: 'En calificación de soldadores bajo código AWS D1.1 / ASME IX, ¿qué posición de soldadura representa la sigla "4G" en plancha?',
+        a: 'Posición plana', b: 'Posición horizontal', c: 'Posición sobrecabeza (techo)', d: 'Posición vertical ascendente', correct: 'C'
+      },
+      {
+        text: '¿Cuál es el propósito técnico de realizar precalentamiento controlado en aceros de alta resistencia o alto carbono antes de soldar?',
+        a: 'Ahorrar consumo de electrodos', b: 'Disminuir la velocidad de enfriamiento para evitar fisuración inducida por hidrógeno en la ZAC', c: 'Eliminar la necesidad de limpieza mecánica', d: 'Aumentar la deformación térmica de la pieza', correct: 'B'
+      }
+    ];
   } else {
-    await conn.query(
-      `INSERT INTO questions (position_id, question_text, option_a, option_b, option_c, option_d, correct_option) VALUES
-      (?, 'Durante la inspección pre-operacional (vuelta del perro 360°), si detecta una fuga activa en una manguera hidráulica de dirección o frenos, ¿cuál es el protocolo obligatorio?', 'Rellenar aceite hidráulico y operar hasta el cambio de turno', 'No operar el equipo, aplicar bloqueo/etiquetado de falla y reportar a supervisión/mantención', 'Colocar un paño absorbente amarrado y continuar', 'Operar solo en terreno plano', 'B'),
-      (?, 'Al descender por una rampa pronunciada en faena minera con el equipo pesado cargado, ¿cuál es la técnica correcta de operación segura?', 'Bajar en neutro controlando solo con el freno de servicio', 'Mantener marcha baja enganchada, usar retardador/freno de motor y llevar el implemento (balde) bajo y controlado', 'Usar la marcha más alta para reducir revoluciones del motor', 'Apagar el motor para ahorrar combustible', 'B'),
-      (?, 'Si operando maquinaria pesada en una pendiente sufre una pérdida repentina de presión en el sistema de frenos principales, ¿cuál es la maniobra inmediata de emergencia?', 'Saltar de la cabina con el equipo en movimiento', 'Bajar inmediatamente el balde/implemento al suelo, activar freno de emergencia y dirigir el equipo hacia el pretil o berma de contención', 'Poner marcha atrás de golpe a alta velocidad', 'Girar bruscamente hacia el borde libre del banco', 'B'),
-      (?, 'Según el ECF N° 3 de Codelco, al estacionar un cargador frontal o excavadora al finalizar la maniobra, ¿qué pasos son obligatorios antes de descender de la cabina?', 'Bajar implemento al piso, aplicar freno de parqueo, colocar cuñas y cortar corriente/contacto', 'Dejar el balde levantado a media altura para visibilidad', 'Dejar el motor encendido en primera marcha sin freno de mano', 'Estacionar detrás de un camión CAEX en punto ciego', 'A'),
-      (?, '¿Qué indica el encendido de una luz roja crítica en el tablero del equipo acompañada de alarma sonora continua durante la operación?', 'Aviso de próximo cambio de filtro de aire en 250 horas', 'Condición crítica de falla (ej. pérdida de presión de aceite o sobretemperatura): detener el equipo de inmediato en lugar seguro', 'Nivel de limpiaparabrisas bajo', 'Aire acondicionado activado', 'B'),
-      (?, '¿Cuál es la regla de prioridad y comunicación obligatoria antes de ingresar con un equipo de apoyo al radio de giro de una pala o zona de carguío activa?', 'Ingresar tocando dos bocinazos sin avisar por radio', 'Solicitar autorización radial directa al operador del equipo principal y esperar confirmación visual y radial expresa', 'Pasar rápido por el lado izquierdo (punto ciego) del equipo', 'Encender solo las luces altas', 'B')`,
-      [posId, posId, posId, posId, posId, posId]
-    );
+    qList = [
+      {
+        text: 'Durante la inspección pre-operacional (vuelta del perro 360°), si detecta una fuga activa en una manguera hidráulica de dirección o frenos, ¿cuál es el protocolo obligatorio?',
+        a: 'Rellenar aceite hidráulico y operar hasta el cambio de turno', b: 'No operar el equipo, aplicar bloqueo/etiquetado de falla y reportar a supervisión/mantención', c: 'Colocar un paño absorbente amarrado y continuar', d: 'Operar solo en terreno plano', correct: 'B'
+      },
+      {
+        text: 'Al descender por una rampa pronunciada en faena minera con el equipo pesado cargado, ¿cuál es la técnica correcta de operación segura?',
+        a: 'Bajar en neutro controlando solo con el freno de servicio', b: 'Mantener marcha baja enganchada, usar retardador/freno de motor y llevar el implemento (balde) bajo y controlado', c: 'Usar la marcha más alta para reducir revoluciones del motor', d: 'Apagar el motor para ahorrar combustible', correct: 'B'
+      },
+      {
+        text: 'Si operando maquinaria pesada en una pendiente sufre una pérdida repentina de presión en el sistema de frenos principales, ¿cuál es la maniobra inmediata de emergencia?',
+        a: 'Saltar de la cabina con el equipo en movimiento', b: 'Bajar inmediatamente el balde/implemento al suelo, activar freno de emergencia y dirigir el equipo hacia el pretil o berma de contención', c: 'Poner marcha atrás de golpe a alta velocidad', d: 'Girar bruscamente hacia el borde libre del banco', correct: 'B'
+      }
+    ];
+  }
+
+  for (let i = 0; i < qList.length; i++) {
+    const q = qList[i];
+    if (existing[i]) {
+      await conn.query(
+        'UPDATE questions SET question_text = ?, option_a = ?, option_b = ?, option_c = ?, option_d = ?, correct_option = ?, category = "TECNICA" WHERE id = ?',
+        [q.text, q.a, q.b, q.c, q.d, q.correct, existing[i].id]
+      );
+    } else {
+      await conn.query(
+        'INSERT INTO questions (position_id, question_text, option_a, option_b, option_c, option_d, correct_option, category) VALUES (?, ?, ?, ?, ?, ?, ?, "TECNICA")',
+        [posId, q.text, q.a, q.b, q.c, q.d, q.correct]
+      );
+    }
   }
 }
 
@@ -1462,14 +1514,22 @@ app.get('/api/positions', async (req, res) => {
   }
 });
 
-// 2. Obtener 5 preguntas aleatorias para el Mini-Test Técnico (Fase 1.5)
+// 2. Obtener 5 preguntas para el Mini-Test Técnico (3 Técnicas Específicas + 2 SJT de Seguridad Crítica ECF)
 app.get('/api/positions/:id/questions', async (req, res) => {
   try {
     const { id } = req.params;
-    const [questions] = await pool.query(
-      'SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE position_id = ? ORDER BY RAND() LIMIT 5',
+    // 3 Preguntas de Idoneidad Técnica Específica para el cargo
+    const [techQuestions] = await pool.query(
+      'SELECT id, position_id, question_text, option_a, option_b, option_c, option_d, category FROM questions WHERE position_id = ? AND category = "TECNICA" ORDER BY id ASC LIMIT 3',
       [id]
     );
+
+    // 2 Preguntas de Juicio Situacional (SJT) sobre Seguridad Crítica / ECF Codelco
+    const [sjtQuestions] = await pool.query(
+      'SELECT id, position_id, question_text, option_a, option_b, option_c, option_d, category FROM questions WHERE category = "SJT" ORDER BY id ASC LIMIT 2'
+    );
+
+    const questions = [...techQuestions, ...sjtQuestions];
     res.json({ questions });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1483,6 +1543,32 @@ app.post('/api/ocr/phase1', async (req, res) => {
     const { credencial_file, cv_file } = req.body;
     if (!credencial_file && !cv_file) {
       return res.status(400).json({ error: 'Adjunte su Credencial Técnica o CV para analizar.' });
+    }
+
+    // Prioridad 1: Extracción con Gemini 1.5 Flash (Comprensión Semántica de Alta Precisión)
+    if (geminiOcr.isGeminiAvailable()) {
+      try {
+        console.log('[OCR/Gemini] Analizando Credencial y CV con Gemini 1.5 Flash...');
+        const geminiData = await geminiOcr.analyzePhase1Documents({
+          credencialBase64: credencial_file,
+          cvBase64: cv_file
+        });
+
+        return res.json({
+          full_name: geminiData.full_name || '',
+          rut_id: geminiData.rut_id || '',
+          email: geminiData.email || '',
+          phone: geminiData.phone || '',
+          city: geminiData.city || '',
+          experience_years: geminiData.experience_years ?? null,
+          experience_months: geminiData.experience_months ?? null,
+          credencial_status: geminiData.credencial_status || 'Documento Técnico Verificado',
+          credencial_vigencia: geminiData.credencial_vigencia || 'Vigente',
+          ocr_text: `[MOTOR: GEMINI 1.5 FLASH]\nPerfil: ${geminiData.resumen_perfil || 'Acreditación técnica conforme'}\nCredencial: ${geminiData.credencial_status} (${geminiData.credencial_vigencia})`
+        });
+      } catch (geminiErr) {
+        console.warn('[OCR/Gemini Fallback] Excepción en Gemini, recurriendo a motor local:', geminiErr.message);
+      }
     }
 
     const items = [];
@@ -1612,34 +1698,48 @@ app.post('/api/candidates/phase1-submit', async (req, res) => {
     const credencialResult = saveBase64File(credencial_file, 'credencial', 'jpg');
     const selfieResult = saveBase64File(initial_selfie, 'selfie_test', 'jpg');
 
-    // Evaluar respuestas del Mini-Test Técnico (5 preguntas, umbral >= 80%)
+    // Evaluar respuestas del Mini-Test Técnico (3 Técnicas + 2 SJT de Seguridad Crítica ECF)
     const parsedAnswers = Array.isArray(answers) ? answers : JSON.parse(answers || '[]');
     let score = 0;
+    let scoreTecnico = 0;
+    let scoreSjt = 0;
     const totalQuestions = parsedAnswers.length;
 
     for (const ans of parsedAnswers) {
-      const [qRow] = await pool.query('SELECT correct_option FROM questions WHERE id = ?', [ans.question_id]);
-      if (qRow.length > 0 && qRow[0].correct_option === ans.selected_option) {
-        score++;
-        ans.is_correct = true;
+      const [qRow] = await pool.query('SELECT correct_option, category, question_text FROM questions WHERE id = ?', [ans.question_id]);
+      if (qRow.length > 0) {
+        const qCat = qRow[0].category || 'TECNICA';
+        if (qRow[0].correct_option === ans.selected_option) {
+          score++;
+          ans.is_correct = true;
+          if (qCat === 'TECNICA') scoreTecnico++;
+          else if (qCat === 'SJT') scoreSjt++;
+        } else {
+          ans.is_correct = false;
+        }
       } else {
         ans.is_correct = false;
       }
     }
 
+    const sjtConforme = (scoreSjt === 2);
     const scoreRatio = totalQuestions > 0 ? (score / totalQuestions) : 0;
-    const passesQuiz = scoreRatio >= 0.80;
+    const passesScore = (score >= 4); // Mínimo 80% (4 de 5)
     const meetsExperience = expYears >= minExpRequired;
+    const passesQuiz = passesScore && sjtConforme;
 
-    // Estado según resultado de Fase 1 / 1.5
+    // Estado según regla de corte normativo de Fase 1 / 1.5
     const nextStatus = (passesQuiz && meetsExperience) ? 'PRESELECCIONADO' : 'DESCARTADO_TECNICO';
 
     const rejectionReasons = [];
+    if (!sjtConforme) {
+      rejectionReasons.push('No conformidad con estándar ECF / Riesgo operacional crítico (Falló reactivo de Juicio Situacional / Paso Cero).');
+    }
+    if (!passesScore) {
+      rejectionReasons.push(`Puntaje en Mini-Test Técnico (${score}/${totalQuestions} — ${Math.round(scoreRatio * 100)}%) inferior al 80% mínimo requerido.`);
+    }
     if (!meetsExperience) {
       rejectionReasons.push(`Experiencia declarada (${expYears} años) menor al mínimo exigido por el ECF Codelco (${minExpRequired} años).`);
-    }
-    if (!passesQuiz) {
-      rejectionReasons.push(`Puntaje en Mini-Test Técnico (${score}/${totalQuestions} — ${Math.round(scoreRatio * 100)}%) inferior al 80% mínimo requerido.`);
     }
 
     const ocrTextPhase1 = (phase1_ocr_data && phase1_ocr_data.ocr_text) ? phase1_ocr_data.ocr_text : '';
@@ -1658,8 +1758,8 @@ app.post('/api/candidates/phase1-submit', async (req, res) => {
 
     const [candRes] = await pool.query(
       `INSERT INTO candidates 
-      (full_name, rut_id, email, phone, city, experience_years, age, position_id, cv_file, credencial_file, cert_file, initial_selfie, score, total_questions, status, ocr_text, ocr_detected_name, ocr_detected_rut, ocr_credencial_status, ocr_manually_edited, ocr_edited_fields, discrepancy_notes, consent_proctoring)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (full_name, rut_id, email, phone, city, experience_years, age, position_id, cv_file, credencial_file, cert_file, initial_selfie, score, total_questions, score_tecnico, score_sjt, sjt_conforme, status, ocr_text, ocr_detected_name, ocr_detected_rut, ocr_credencial_status, ocr_manually_edited, ocr_edited_fields, discrepancy_notes, consent_proctoring)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         formattedName,
         formattedRut,
@@ -1675,6 +1775,9 @@ app.post('/api/candidates/phase1-submit', async (req, res) => {
         selfieResult.url,
         score,
         totalQuestions,
+        scoreTecnico,
+        scoreSjt,
+        sjtConforme ? 1 : 0,
         nextStatus,
         ocrTextPhase1,
         ocrDetectedName,
@@ -1701,9 +1804,15 @@ app.post('/api/candidates/phase1-submit', async (req, res) => {
       score,
       totalQuestions,
       scorePercent: Math.round(scoreRatio * 100),
+      score_tecnico: scoreTecnico,
+      score_sjt: scoreSjt,
+      sjt_conforme: sjtConforme,
       status: nextStatus,
-      qualifiedForPhase2: nextStatus === 'PRESELECCIONADO',
-      rejectionReasons
+      qualifiedForPhase2: false, // Bloqueado: requiere aprobación formal de faena por RR.HH. para recibir enlace
+      rejectionReasons,
+      message: nextStatus === 'PRESELECCIONADO'
+        ? 'Evaluación técnica aprobada. Su expediente quedó en estado PRESELECCIONADO en espera de asignación de cupo en faena por parte de RR.HH.'
+        : 'No califica en esta convocatoria.'
     });
   } catch (err) {
     console.error('[Error /api/candidates/phase1-submit]:', err);
@@ -1730,6 +1839,14 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
     }
     const candidate = candRows[0];
 
+    // Regla de corte: El candidato solo puede acceder a Fase 2 si fue APROBADO_FAENA por RR.HH.
+    const allowedStatuses = ['APROBADO_FAENA', 'DOCS_CARGADOS', 'EN_REVISION_MANUAL', 'PRE_ACREDITADO'];
+    if (!allowedStatuses.includes(candidate.status)) {
+      return res.status(403).json({
+        error: 'Su postulación aún no cuenta con autorización previa de acceso a faena por parte de RR.HH. Debe esperar la aprobación formal para subir sus antecedentes.'
+      });
+    }
+
     // Guardar archivos de Fase 2
     const carnetFrontRes = saveBase64File(carnet_file, `carnet_${id}`, 'jpg');
     const carnetBackRes = saveBase64File(carnet_back_file, `carnet_rev_${id}`, 'jpg');
@@ -1738,86 +1855,121 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
     // Estado transitorio DOCS_CARGADOS antes del análisis cruzado
     await pool.query("UPDATE candidates SET status = 'DOCS_CARGADOS' WHERE id = ?", [id]);
 
-    // Ejecutar Motor OCR de Validación Cruzada (Fase 3)
-    const itemsToScan = [
-      { type: 'CEDULA_FRENTE', filePath: carnetFrontRes.absolutePath },
-      { type: 'CEDULA_REVERSO', filePath: carnetBackRes.absolutePath },
-      { type: 'CERT_ANTECEDENTES', filePath: antecedentesRes.absolutePath }
-    ];
-
-    const { combinedText, parsedByType } = await runTesseractOnFiles(itemsToScan);
-    const cedFront = parsedByType.CEDULA_FRENTE || {};
-    const cedBack = parsedByType.CEDULA_REVERSO || {};
-    const ant = parsedByType.CERT_ANTECEDENTES || {};
-
-    // Si en Fase 1 el nombre quedó incompleto o era un falso positivo (ej. universidad), repararlo
     let effectiveCandidateName = candidate.full_name;
-    if (!isValidPersonName(effectiveCandidateName) && candidate.ocr_text) {
-      const reparsedPhase1 = parseExtractedText(candidate.ocr_text);
-      if (isValidPersonName(reparsedPhase1.detected_name)) {
-        effectiveCandidateName = reparsedPhase1.detected_name;
-        await pool.query('UPDATE candidates SET full_name = ? WHERE id = ?', [effectiveCandidateName, id]);
-      }
-    }
+    let ocrCarnetName = candidate.full_name;
+    let ocrCarnetRut = candidate.rut_id;
+    let ocrBirthDate = null;
+    let ocrDetectedAge = candidate.age || 30;
+    let ocrCarnetVigencia = 'Vigente';
+    let ocrAntecedentesStatus = 'Sin Anotaciones';
+    let crossCheckOk = false;
+    let discrepancies = [];
+    let combinedText = '';
 
-    const ocrCarnetName = pickBestPersonName(
-      [cedFront.detected_name, cedBack.detected_name, ant.detected_name],
-       isValidPersonName(effectiveCandidateName) ? effectiveCandidateName : candidate.email
-    );
-    if (!isValidPersonName(effectiveCandidateName) && ocrCarnetName) {
-      effectiveCandidateName = ocrCarnetName;
-    }
+    let geminiProcessed = false;
+    if (geminiOcr.isGeminiAvailable()) {
+      try {
+        console.log(`[OCR/Gemini] Analizando Cédula y Antecedentes con Gemini 1.5 Flash para #${id}...`);
+        const g2 = await geminiOcr.analyzePhase2IdentityDocuments({
+          carnetFrontBase64: carnet_file,
+          carnetBackBase64: carnet_back_file,
+          antecedentesBase64: antecedentes_file,
+          phase1Rut: candidate.rut_id,
+          phase1Name: candidate.full_name
+        });
 
-    const ocrCarnetRut = cedFront.detected_rut || cedBack.detected_rut || ant.detected_rut || null;
-    const ocrBirthDate = cedFront.birth_date || cedBack.birth_date || ant.birth_date || null;
-    const ocrDetectedAge = cedFront.detected_age ?? cedBack.detected_age ?? ant.detected_age ?? candidate.age;
-    const ocrCarnetVigencia = cedFront.carnet_vigencia || cedBack.carnet_vigencia || 'Verificación Visual en Carnet';
-    const ocrAntecedentesStatus = ant.antecedentes_status || cedFront.antecedentes_status || cedBack.antecedentes_status || 'Certificado Cargado (Validar Código)';
-
-    // Validaciones Cruzadas (Cruce Carnet vs. Postulación/Credencial Fase 1)
-    const discrepancies = [];
-
-    const cleanCandidateRut = (candidate.rut_id || '').replace(/[^0-9kK]/g, '').toUpperCase();
-    const cleanCarnetRut = (ocrCarnetRut || '').replace(/[^0-9kK]/g, '').toUpperCase();
-
-    let rutMatches = false;
-    if (cleanCarnetRut && cleanCarnetRut === cleanCandidateRut) {
-      rutMatches = true;
-    } else if (cleanCarnetRut && cleanCarnetRut !== cleanCandidateRut) {
-      discrepancies.push(`Discordancia de RUT: Fase 1 (${candidate.rut_id}) vs. Cédula OCR (${ocrCarnetRut}).`);
-    } else {
-      discrepancies.push('OCR no logró leer el RUT nítidamente en la foto de la cédula (requiere validación visual).');
-    }
-
-    const normCandidateName = normalizeTextForMatch(effectiveCandidateName);
-    const normCarnetName = normalizeTextForMatch(ocrCarnetName);
-    let nameMatches = false;
-    if (normCarnetName) {
-      const candidateTokens = normCandidateName.split(' ').filter(t => t.length > 2);
-      const carnetTokens = normCarnetName.split(' ').filter(t => t.length > 2);
-      const matchedTokens = candidateTokens.filter(t => normCarnetName.includes(t));
-      if (matchedTokens.length >= Math.min(2, candidateTokens.length)) {
-        nameMatches = true;
-        // Si la Cédula trae el nombre legal más completo que el CV (ej. "Cristóbal Mena Illanes" vs "Cristóbal Mena"), actualizar al nombre completo oficial
-        if (carnetTokens.length > candidateTokens.length && candidateTokens.every(t => normCarnetName.includes(t))) {
+        if (g2) {
+          geminiProcessed = true;
+          ocrCarnetName = g2.carnet_name || candidate.full_name;
           effectiveCandidateName = ocrCarnetName;
+          ocrCarnetRut = g2.carnet_rut || candidate.rut_id;
+          ocrCarnetVigencia = g2.carnet_vigencia || (g2.carnet_vigente_bool ? 'Vigente' : 'Vencido');
+          ocrAntecedentesStatus = g2.antecedentes_status || (g2.tiene_anotaciones_penales ? 'Con Anotaciones Penales' : 'Sin Anotaciones');
+          crossCheckOk = Boolean(g2.cross_check_ok);
+          if (g2.discrepancy_notes && !crossCheckOk) {
+            discrepancies.push(g2.discrepancy_notes);
+          }
+          combinedText = `[MOTOR: GEMINI 1.5 FLASH]\nCédula: ${ocrCarnetName} (${ocrCarnetRut}) - ${ocrCarnetVigencia}\nAntecedentes: ${ocrAntecedentesStatus}\nCruce Identidad: ${crossCheckOk ? 'CONFORME' : 'CON DISCORDANCIAS'}`;
         }
-      } else {
-        discrepancies.push(`Discordancia de Nombre: Postulación ("${effectiveCandidateName}") vs. Cédula OCR ("${ocrCarnetName}").`);
+      } catch (geminiErr) {
+        console.warn('[OCR/Gemini Fallback Phase 2]:', geminiErr.message);
       }
     }
 
-    if (ocrCarnetVigencia.startsWith('Vencido')) {
-      discrepancies.push(`Cédula de Identidad figura vencida (${ocrCarnetVigencia}).`);
-    }
+    if (!geminiProcessed) {
+      // Fallback a motor Tesseract/Poppler local
+      const itemsToScan = [
+        { type: 'CEDULA_FRENTE', filePath: carnetFrontRes.absolutePath },
+        { type: 'CEDULA_REVERSO', filePath: carnetBackRes.absolutePath },
+        { type: 'CERT_ANTECEDENTES', filePath: antecedentesRes.absolutePath }
+      ];
 
-    if (ocrAntecedentesStatus.includes('Con Anotaciones')) {
-      discrepancies.push('Certificado de Antecedentes registra anotaciones que requieren revisión de RR.HH.');
-    }
+      const localOcr = await runTesseractOnFiles(itemsToScan);
+      combinedText = localOcr.combinedText;
+      const cedFront = localOcr.parsedByType.CEDULA_FRENTE || {};
+      const cedBack = localOcr.parsedByType.CEDULA_REVERSO || {};
+      const ant = localOcr.parsedByType.CERT_ANTECEDENTES || {};
 
-    // Si el OCR validó RUT consistente y sin alertas de vencimiento/antecedentes -> PRE_ACREDITADO
-    // Si hubo discordancia o foto borrosa -> EN_REVISION_MANUAL
-    const crossCheckOk = rutMatches && !ocrCarnetVigencia.startsWith('Vencido') && !ocrAntecedentesStatus.includes('Con Anotaciones') && discrepancies.length === 0;
+      if (!isValidPersonName(effectiveCandidateName) && candidate.ocr_text) {
+        const reparsedPhase1 = parseExtractedText(candidate.ocr_text);
+        if (isValidPersonName(reparsedPhase1.detected_name)) {
+          effectiveCandidateName = reparsedPhase1.detected_name;
+          await pool.query('UPDATE candidates SET full_name = ? WHERE id = ?', [effectiveCandidateName, id]);
+        }
+      }
+
+      ocrCarnetName = pickBestPersonName(
+        [cedFront.detected_name, cedBack.detected_name, ant.detected_name],
+        isValidPersonName(effectiveCandidateName) ? effectiveCandidateName : candidate.email
+      );
+      if (!isValidPersonName(effectiveCandidateName) && ocrCarnetName) {
+        effectiveCandidateName = ocrCarnetName;
+      }
+
+      ocrCarnetRut = cedFront.detected_rut || cedBack.detected_rut || ant.detected_rut || null;
+      ocrBirthDate = cedFront.birth_date || cedBack.birth_date || ant.birth_date || null;
+      ocrDetectedAge = cedFront.detected_age ?? cedBack.detected_age ?? ant.detected_age ?? candidate.age;
+      ocrCarnetVigencia = cedFront.carnet_vigencia || cedBack.carnet_vigencia || 'Verificación Visual en Carnet';
+      ocrAntecedentesStatus = ant.antecedentes_status || cedFront.antecedentes_status || cedBack.antecedentes_status || 'Certificado Cargado (Validar Código)';
+
+      const cleanCandidateRut = (candidate.rut_id || '').replace(/[^0-9kK]/g, '').toUpperCase();
+      const cleanCarnetRut = (ocrCarnetRut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+
+      let rutMatches = false;
+      if (cleanCarnetRut && cleanCarnetRut === cleanCandidateRut) {
+        rutMatches = true;
+      } else if (cleanCarnetRut && cleanCarnetRut !== cleanCandidateRut) {
+        discrepancies.push(`Discordancia de RUT: Fase 1 (${candidate.rut_id}) vs. Cédula OCR (${ocrCarnetRut}).`);
+      } else {
+        discrepancies.push('OCR no logró leer el RUT nítidamente en la foto de la cédula (requiere validación visual).');
+      }
+
+      const normCandidateName = normalizeTextForMatch(effectiveCandidateName);
+      const normCarnetName = normalizeTextForMatch(ocrCarnetName);
+      let nameMatches = false;
+      if (normCarnetName) {
+        const candidateTokens = normCandidateName.split(' ').filter(t => t.length > 2);
+        const carnetTokens = normCarnetName.split(' ').filter(t => t.length > 2);
+        const matchedTokens = candidateTokens.filter(t => normCarnetName.includes(t));
+        if (matchedTokens.length >= Math.min(2, candidateTokens.length)) {
+          nameMatches = true;
+          if (carnetTokens.length > candidateTokens.length && candidateTokens.every(t => normCarnetName.includes(t))) {
+            effectiveCandidateName = ocrCarnetName;
+          }
+        } else {
+          discrepancies.push(`Discordancia de Nombre: Postulación ("${effectiveCandidateName}") vs. Cédula OCR ("${ocrCarnetName}").`);
+        }
+      }
+
+      if (ocrCarnetVigencia.startsWith('Vencido')) {
+        discrepancies.push(`Cédula de Identidad figura vencida (${ocrCarnetVigencia}).`);
+      }
+      if (ocrAntecedentesStatus.includes('Con Anotaciones')) {
+        discrepancies.push('Certificado de Antecedentes registra anotaciones que requieren revisión de RR.HH.');
+      }
+
+      crossCheckOk = rutMatches && !ocrCarnetVigencia.startsWith('Vencido') && !ocrAntecedentesStatus.includes('Con Anotaciones') && discrepancies.length === 0;
+    }
     const finalStatus = crossCheckOk ? 'PRE_ACREDITADO' : 'EN_REVISION_MANUAL';
 
     const updatedOcrText = [candidate.ocr_text, combinedText].filter(Boolean).join('\n\n');
@@ -1840,7 +1992,8 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
         ocr_antecedentes_status = ?,
         ocr_cross_check_ok = ?,
         discrepancy_notes = ?,
-        consent_ley19628 = 1
+        consent_ley19628 = 1,
+        token_used_at = NOW()
       WHERE id = ?`,
       [
         effectiveCandidateName,
@@ -1875,6 +2028,121 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
     });
   } catch (err) {
     console.error('[Error /api/candidates/:id/phase2-acreditacion]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5.5 VALIDACIÓN DE TOKEN DE ACCESO ASÍNCRONO A FASE 2
+app.get('/api/candidates/access/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token || token.trim().length < 16) {
+      return res.status(400).json({ error: 'Token de acceso no especificado o formato inválido.' });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT c.id, c.full_name, c.rut_id, c.email, c.phone, c.city, c.experience_years, 
+              c.position_id, c.status, c.score_tecnico, c.score_sjt, c.sjt_conforme, 
+              c.token_expires_at, p.name as position_name, p.required_credential
+       FROM candidates c
+       LEFT JOIN positions p ON c.position_id = p.id
+       WHERE c.access_token = ?`,
+      [token.trim()]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Enlace de acceso no encontrado o no registrado en el sistema.' });
+    }
+
+    const c = rows[0];
+
+    // Verificar si expiró el token (7 días)
+    if (c.token_expires_at && new Date() > new Date(c.token_expires_at)) {
+      return res.status(403).json({ 
+        error: 'Este enlace de acceso ha expirado (validez máxima de 7 días). Solicite a RR.HH. un nuevo enlace de acreditación.' 
+      });
+    }
+
+    // Regla de corte: Debe estar aprobado para faena por RR.HH.
+    const allowedStatuses = ['APROBADO_FAENA', 'DOCS_CARGADOS', 'EN_REVISION_MANUAL', 'PRE_ACREDITADO'];
+    if (!allowedStatuses.includes(c.status)) {
+      return res.status(403).json({
+        error: 'Su postulación aún no cuenta con la aprobación formal de acceso a faena por parte de RR.HH.'
+      });
+    }
+
+    res.json({
+      id: c.id,
+      full_name: c.full_name,
+      rut_id: c.rut_id,
+      email: c.email,
+      phone: c.phone,
+      city: c.city,
+      experience_years: c.experience_years,
+      position_id: c.position_id,
+      position_name: c.position_name,
+      required_credential: c.required_credential,
+      status: c.status,
+      score_tecnico: c.score_tecnico,
+      score_sjt: c.score_sjt,
+      sjt_conforme: c.sjt_conforme
+    });
+  } catch (err) {
+    console.error('[Error /api/candidates/access/:token]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5.6 PANEL RR.HH.: APROBAR ACCESO A FAENA Y EMITIR ENLACE DE FASE 2
+app.post('/api/admin/candidates/:id/approve-faena', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [candRows] = await pool.query(
+      `SELECT c.*, p.name as position_name 
+       FROM candidates c 
+       LEFT JOIN positions p ON c.position_id = p.id 
+       WHERE c.id = ?`,
+      [id]
+    );
+
+    if (candRows.length === 0) {
+      return res.status(404).json({ error: 'Candidato no encontrado.' });
+    }
+
+    const candidate = candRows[0];
+    const { token, expiresAt } = mailer.generateAccessToken(7);
+
+    await pool.query(
+      `UPDATE candidates 
+       SET status = 'APROBADO_FAENA', 
+           access_token = ?, 
+           token_expires_at = ? 
+       WHERE id = ?`,
+      [token, expiresAt, id]
+    );
+
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const magicLink = `${protocol}://${host}/?token=${token}`;
+
+    await mailer.sendPhase2InvitationEmail({
+      email: candidate.email,
+      full_name: candidate.full_name,
+      position_name: candidate.position_name,
+      magic_link: magicLink,
+      expires_at: expiresAt
+    });
+
+    res.json({
+      success: true,
+      message: `Acceso a faena aprobado para ${candidate.full_name}. Enlace despachado a ${candidate.email || 'correo del postulante'}.`,
+      candidate_id: Number(id),
+      new_status: 'APROBADO_FAENA',
+      magic_link: magicLink,
+      expires_at: expiresAt
+    });
+  } catch (err) {
+    console.error('[Error /api/admin/candidates/:id/approve-faena]:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2037,7 +2305,7 @@ app.get('/api/admin/candidates/:id/export-webcontrol', async (req, res) => {
 
     <h2>2. Resultados de Pre-Filtro Técnico y Validación Cruzada OCR</h2>
     <table>
-      <tr><th>Mini-Test Técnico (Umbral &ge; 80%)</th><td><strong>${c.score} / ${c.total_questions} (${scorePercent}%)</strong> — Aprobado</td></tr>
+      <tr><th>Mini-Test Técnico (Umbral &ge; 80%)</th><td><strong>${c.score} / ${c.total_questions} (${scorePercent}%)</strong> | Idoneidad Técnica: <strong>${c.score_tecnico ?? 0}/3</strong> | Juicio Situacional ECF: <strong>${c.score_sjt ?? 0}/2 (${c.sjt_conforme ? 'Conforme' : 'No Conforme'})</strong></td></tr>
       <tr><th>Credencial Técnica Habilitante</th><td>${c.ocr_credencial_status || c.required_credential}</td></tr>
       <tr><th>Vigencia Cédula de Identidad (OCR)</th><td>${c.ocr_carnet_vigencia || 'Verificada'}</td></tr>
       <tr><th>Certificado de Antecedentes (OCR)</th><td>${c.ocr_antecedentes_status || 'Sin Antecedentes'}</td></tr>

@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (['PRE_ACREDITADO', 'CONTRATADO_FAENA', 'Aprobado'].includes(status)) {
       return 'status-Aprobado';
     }
+    if (status === 'APROBADO_FAENA') {
+      return 'status-Pendiente';
+    }
     if (['DESCARTADO_TECNICO', 'Rechazado'].includes(status)) {
       return 'status-Rechazado';
     }
@@ -81,28 +84,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const scorePercent = c.total_questions > 0 ? Math.round((c.score / c.total_questions) * 100) : 0;
         const expDisplay = c.experience_years ? `${c.experience_years} años` : `${c.age || 3} años`;
 
-        let crossCheckBadge = '<span class="badge-code">Fase 1</span>';
+        let crossCheckBadge = '<span class="badge-code">[FASE 01]</span>';
         if (c.ocr_cross_check_ok) {
-          crossCheckBadge = '<span class="badge-code" style="background: var(--status-normal-bg); color: var(--status-normal-text); border-color: var(--status-normal-border);">Consistencia 100%</span>';
+          crossCheckBadge = '<span class="badge-code" style="color: var(--ecf-emerald); border-color: var(--ecf-emerald-border); background: var(--ecf-emerald-dim);">[CONFORME ECF]</span>';
         } else if (c.status === 'EN_REVISION_MANUAL') {
-          crossCheckBadge = '<span class="badge-code" style="background: var(--status-warning-bg); color: var(--status-warning-text); border-color: var(--status-warning-border);">Discordancia OCR</span>';
+          crossCheckBadge = '<span class="badge-code" style="color: var(--safety-yellow); border-color: var(--safety-yellow); background: var(--safety-yellow-dim);">[DISCORDANCIA OCR]</span>';
         } else if (c.status === 'DESCARTADO_TECNICO') {
-          crossCheckBadge = '<span class="badge-code" style="background: var(--status-error-bg); color: var(--status-error-text); border-color: var(--status-error-border);">Filtro ECF</span>';
+          crossCheckBadge = '<span class="badge-code" style="color: var(--ecf-crimson); border-color: var(--ecf-crimson-border); background: var(--ecf-crimson-dim);">[NO CONFORME ECF]</span>';
         }
 
         const canExport = ['PRE_ACREDITADO', 'CONTRATADO_FAENA', 'EN_REVISION_MANUAL', 'Aprobado'].includes(c.status);
 
         return `
           <tr>
-            <td><strong style="color: var(--primary);">#${c.id}</strong></td>
-            <td><strong style="color: var(--primary);">${escapeHtml(c.full_name)}</strong></td>
-            <td><span style="font-family: monospace; color: var(--text-muted);">${escapeHtml(c.rut_id)}</span></td>
-            <td>${expDisplay}</td>
+            <td><strong style="color: var(--safety-yellow); font-family: 'JetBrains Mono', monospace;">#${c.id}</strong></td>
+            <td><strong style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${escapeHtml(c.full_name)}</strong></td>
+            <td><span style="font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);">${escapeHtml(c.rut_id)}</span></td>
+            <td><span style="font-family: 'JetBrains Mono', monospace;">${expDisplay}</span></td>
             <td><span class="position-tag">${escapeHtml(c.position_name)}</span></td>
             <td>
               <span class="badge-code">${c.score}/${c.total_questions} (${scorePercent}%)</span>
+              <div style="font-size: 0.72rem; margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);">
+                Téc: <strong>${c.score_tecnico ?? 0}/3</strong> | SJT: <strong style="color: ${c.sjt_conforme ? 'var(--ecf-emerald)' : 'var(--ecf-crimson)'};">${c.sjt_conforme ? '2/2' : `${c.score_sjt ?? 0}/2`}</strong>
+              </div>
             </td>
-            <td>${crossCheckBadge}</td>
+            <td>
+              ${crossCheckBadge}
+              ${(!c.sjt_conforme && c.status === 'DESCARTADO_TECNICO') ? `<br><span class="badge-code" style="color: var(--ecf-crimson); border-color: var(--ecf-crimson-border); background: var(--ecf-crimson-dim); margin-top: 0.25rem; display: inline-block;">[RIESGO OPERACIONAL ECF]</span>` : ''}
+            </td>
             <td>
               <span class="status-pill ${getStatusPillClass(c.status)}">${escapeHtml(c.status)}</span>
             </td>
@@ -152,10 +161,27 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="value">${escapeHtml(candidate.position_name)}</span>
         </div>
         <div class="info-item">
-          <span class="label">Mini-Test Técnico (&ge;80%)</span>
-          <span class="value">${candidate.score} / ${candidate.total_questions} (${scorePercent}%)</span>
+          <span class="label">Score Técnico (P1 a P3)</span>
+          <span class="value">[${candidate.score_tecnico ?? 0} / 3]</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Índice Conductual ECF (SJT)</span>
+          <span class="value" style="color: ${candidate.sjt_conforme ? 'var(--ecf-emerald)' : 'var(--ecf-crimson)'};">
+            [${candidate.sjt_conforme ? 'CONFORME (2/2)' : 'NO CONFORME (Falla Crítica)'}]
+          </span>
+        </div>
+        <div class="info-item">
+          <span class="label">Veredicto Fase 1.5</span>
+          <span class="status-pill ${getStatusPillClass(candidate.status)}">[${escapeHtml(candidate.status)}]</span>
         </div>
       </div>
+
+      ${!candidate.sjt_conforme ? `
+        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid var(--ecf-crimson-border); background: var(--ecf-crimson-dim); color: var(--ecf-crimson); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;">
+          <strong>[ALERTA AUDITORÍA: RIESGO OPERACIONAL CRÍTICO]</strong><br>
+          El postulante falló al menos un reactivo de Juicio Situacional (SJT). Vulneró el principio de detención de faena ('Paso Cero' / Derecho a Decir NO) o no detuvo la maniobra ante falla de estabilidad de grúa. Descartado por regla de corte normativo excluyente ECF Codelco.
+        </div>
+      ` : ''}
 
       <!-- Comparativa Visual de Identidad (Face Match: Selfie Transparente vs. Foto Carnet) -->
       <div class="media-box">
@@ -196,16 +222,16 @@ document.addEventListener('DOMContentLoaded', () => {
           <p><strong>4. Cert. Antecedentes (OCR):</strong><br>${escapeHtml(candidate.ocr_antecedentes_status || 'Pendiente Fase 2')}</p>
         </div>
 
-        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-standard); border: 1px solid ${candidate.ocr_cross_check_ok ? 'var(--status-normal-border)' : 'var(--status-warning-border)'}; background: ${candidate.ocr_cross_check_ok ? 'var(--status-normal-bg)' : 'var(--status-warning-bg)'}; color: ${candidate.ocr_cross_check_ok ? 'var(--status-normal-text)' : 'var(--status-warning-text)'}; font-size: 0.85rem;">
-          <strong>Diagnóstico del Motor de Reglas y Consistencia:</strong><br>
-          ${escapeHtml(candidate.discrepancy_notes || 'Expediente consistente.')}
-          ${candidate.ocr_manually_edited ? `<br><em>Nota: El postulante editó manualmente en Fase 1: ${escapeHtml(candidate.ocr_edited_fields || '')}</em>` : ''}
+        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald-border)' : 'var(--safety-yellow)'}; background: ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald-dim)' : 'var(--safety-yellow-dim)'}; color: ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald)' : 'var(--safety-yellow)'}; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace;">
+          <strong>DIAGNÓSTICO NORMATIVO (ECF / DS N° 132):</strong><br>
+          ${escapeHtml(candidate.discrepancy_notes || 'Expediente consistente. Sin observaciones.')}
+          ${candidate.ocr_manually_edited ? `<br><em>Nota de Auditoría: El postulante editó manualmente en Fase 1: ${escapeHtml(candidate.ocr_edited_fields || '')}</em>` : ''}
         </div>
 
         ${candidate.ocr_text ? `
-          <details style="margin-top: 0.75rem; background: var(--surface-container); padding: 0.75rem; border-radius: var(--radius-standard); border: 1px solid var(--border-standard);">
-            <summary style="cursor: pointer; font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;">Ver texto extraído por OCR (Fase 1 + Fase 2)</summary>
-            <pre style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; margin-top: 0.5rem; max-height: 150px; overflow-y: auto;">${escapeHtml(candidate.ocr_text)}</pre>
+          <details style="margin-top: 0.75rem; background: var(--surface-panel); padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid var(--border-structural);">
+            <summary style="cursor: pointer; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-secondary);">[VER LOG DE TEXTO EXTRAÍDO POR OCR]</summary>
+            <pre style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; margin-top: 0.5rem; max-height: 150px; overflow-y: auto; color: var(--text-primary);">${escapeHtml(candidate.ocr_text)}</pre>
           </details>
         ` : ''}
       </div>
@@ -224,6 +250,35 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
+      <!-- Acción Operativa de Aprobación de Acceso a Faena (Fase 2) -->
+      ${candidate.status === 'PRESELECCIONADO' ? `
+        <div style="background: rgba(255, 184, 0, 0.08); border: 1px solid var(--safety-yellow); padding: 1.15rem; border-radius: var(--radius-terminal); margin-top: 1rem; text-align: left;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 700; color: var(--safety-yellow); margin-bottom: 0.35rem;">
+            [ACCIÓN DE RR.HH.: AUTORIZAR ACCESO A FAENA]
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-primary); margin: 0 0 0.85rem 0;">
+            El postulante aprobó la evaluación técnica. Por normativa laboral (Ley N° 19.628), la Fase 2 (Cédula y Antecedentes) permanece bloqueada hasta que RR.HH. autorice el cupo de faena. Al presionar este botón, se emitirá su token de acceso y se le despachará el enlace a su correo electrónico (<strong>${escapeHtml(candidate.email || 'correo')}</strong>).
+          </p>
+          <button class="btn btn-primary" id="btn-approve-faena" onclick="approveFaena(${candidate.id})" style="width: 100%; justify-content: center;">
+            [ APROBAR ACCESO A FAENA Y ENVIAR ENLACE FASE 2 ]
+          </button>
+        </div>
+      ` : ''}
+
+      ${candidate.status === 'APROBADO_FAENA' ? `
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid var(--ecf-emerald); padding: 1.15rem; border-radius: var(--radius-terminal); margin-top: 1rem; text-align: left;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 700; color: var(--ecf-emerald); margin-bottom: 0.35rem;">
+            [ACCESO A FAENA APROBADO — ENLACE FASE 2 ACTIVO]
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-primary); margin: 0 0 0.85rem 0;">
+            El candidato cuenta con autorización de faena activa para cargar su Cédula y Certificado de Antecedentes (Fase 2).
+          </p>
+          <button class="btn btn-secondary btn-sm" id="btn-approve-faena" onclick="approveFaena(${candidate.id})">
+            [ RE-ENVIAR / RE-GENERAR ENLACE FASE 2 ]
+          </button>
+        </div>
+      ` : ''}
+
       <!-- Controles de la Máquina de Estados -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-top:1rem; padding-top:1rem; border-top: 1px solid var(--border-standard);">
         <div>
@@ -239,6 +294,36 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     modalCandidate.style.display = 'flex';
+  };
+
+  window.approveFaena = async (id) => {
+    const btn = document.getElementById('btn-approve-faena');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Aprobando y despachando correo...';
+    }
+    try {
+      const res = await fetch(`/api/admin/candidates/${id}/approve-faena`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Acceso a faena aprobado exitosamente.\n\nEnlace despachado al correo:\n${data.magic_link}`);
+        await loadCandidates();
+        await loadStats();
+        window.viewCandidate(id);
+      } else {
+        alert(`Error al aprobar acceso a faena: ${data.error}`);
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '[ APROBAR ACCESO A FAENA Y ENVIAR ENLACE FASE 2 ]';
+        }
+      }
+    } catch (e) {
+      alert('Error de conexión al aprobar acceso a faena.');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '[ APROBAR ACCESO A FAENA Y ENVIAR ENLACE FASE 2 ]';
+      }
+    }
   };
 
   window.reprocessCandidateOcr = async (id) => {

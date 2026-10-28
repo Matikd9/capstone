@@ -63,6 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const hintCity = document.getElementById('hint-city');
   const hintExp = document.getElementById('hint-exp');
 
+  // Telemetría en Tiempo Real de Datos Parseados (Fase 1)
+  const telemetryRut = document.getElementById('telemetry-rut');
+  const telemetryCity = document.getElementById('telemetry-city');
+  const telemetryExp = document.getElementById('telemetry-exp');
+  const telemetryCred = document.getElementById('telemetry-cred');
+
   // Cámara Proctoring Transparente
   const webcamView = document.getElementById('webcam-view');
   const proctoringLiveVideo = document.getElementById('proctoring-live-video');
@@ -115,6 +121,169 @@ document.addEventListener('DOMContentLoaded', () => {
       reader.onload = () => resolve(reader.result);
       reader.onerror = err => reject(err);
       reader.readAsDataURL(file);
+    });
+  }
+
+  function formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  // Controlador de Dropzone Industrial (Drag & Drop + Validación Técnica)
+  function setupIndustrialDropzone({
+    dropzoneId,
+    inputId,
+    onFileSelected,
+    onFileCleared,
+    maxSizeMB = 10
+  }) {
+    const dropzone = document.getElementById(dropzoneId);
+    const input = document.getElementById(inputId);
+    if (!dropzone || !input) return;
+
+    const emptyView = dropzone.querySelector('.dropzone-empty');
+    const loadedView = dropzone.querySelector('.dropzone-loaded');
+    const errorMsg = dropzone.querySelector('.dropzone-error-msg');
+    const fileNameEl = dropzone.querySelector('.dropzone-file-name');
+    const fileMetaEl = dropzone.querySelector('.dropzone-file-meta');
+    const btnReplace = dropzone.querySelector('.btn-replace');
+    const btnRemove = dropzone.querySelector('.btn-remove');
+
+    function showError(msg) {
+      dropzone.classList.add('dropzone-error');
+      if (errorMsg) {
+        errorMsg.textContent = msg;
+        errorMsg.style.display = 'block';
+      }
+    }
+
+    function clearError() {
+      dropzone.classList.remove('dropzone-error');
+      if (errorMsg) {
+        errorMsg.textContent = '';
+        errorMsg.style.display = 'none';
+      }
+    }
+
+    function resetToEmpty() {
+      clearError();
+      input.value = '';
+      dropzone.classList.remove('is-loaded');
+      if (emptyView) emptyView.style.display = 'flex';
+      if (loadedView) loadedView.style.display = 'none';
+      if (fileNameEl) fileNameEl.textContent = '';
+      if (fileMetaEl) fileMetaEl.textContent = '';
+      if (onFileCleared) onFileCleared();
+    }
+
+    function setLoadedFile(file) {
+      clearError();
+      dropzone.classList.add('is-loaded');
+      if (emptyView) emptyView.style.display = 'none';
+      if (loadedView) loadedView.style.display = 'flex';
+      if (fileNameEl) fileNameEl.textContent = file.name;
+      if (fileMetaEl) fileMetaEl.textContent = `${formatFileSize(file.size)} - [VALIDADO TÉCNICAMENTE]`;
+      if (onFileSelected) onFileSelected(file);
+    }
+
+    function validateAndProcess(file) {
+      if (!file) return;
+
+      const validExtensions = /\.(pdf|jpe?g|png|webp|bmp)$/i;
+      const isMimeValid = file.type === 'application/pdf' || file.type.startsWith('image/');
+      const isExtValid = validExtensions.test(file.name);
+
+      if (!isMimeValid && !isExtValid) {
+        resetToEmpty();
+        showError('[ERROR DE FORMATO]: Solo se admiten archivos PDF, JPG o PNG');
+        return;
+      }
+
+      const maxBytes = maxSizeMB * 1024 * 1024;
+      if (file.size > maxBytes) {
+        resetToEmpty();
+        showError(`[ERROR DE TAMAÑO]: Excede el límite de ${maxSizeMB}MB (${formatFileSize(file.size)})`);
+        return;
+      }
+
+      setLoadedFile(file);
+    }
+
+    // Clic en la caja abre selector si no está cargada
+    dropzone.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-dropzone-action')) return;
+      if (dropzone.classList.contains('is-loaded')) return;
+      input.click();
+    });
+
+    if (btnReplace) {
+      btnReplace.addEventListener('click', (e) => {
+        e.stopPropagation();
+        input.click();
+      });
+    }
+
+    if (btnRemove) {
+      btnRemove.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetToEmpty();
+      });
+    }
+
+    input.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        validateAndProcess(file);
+      }
+    });
+
+    // Eventos Drag & Drop con contador para evitar parpadeo en hijos
+    let dragCounter = 0;
+    dropzone.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter++;
+      dropzone.classList.add('drag-over');
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!dropzone.classList.contains('drag-over')) {
+        dropzone.classList.add('drag-over');
+      }
+    });
+
+    dropzone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        dropzone.classList.remove('drag-over');
+      }
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter = 0;
+      dropzone.classList.remove('drag-over');
+
+      const dt = e.dataTransfer;
+      const file = dt && dt.files && dt.files[0];
+      if (file) {
+        try {
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          input.files = dataTransfer.files;
+        } catch (err) {
+          // Fallback silencioso si DataTransfer no está soportado
+        }
+        validateAndProcess(file);
+      }
     });
   }
 
@@ -223,6 +392,17 @@ document.addEventListener('DOMContentLoaded', () => {
           hintExp.style.color = 'var(--status-normal-text)';
         }
 
+        // Actualizar Telemetría en Tiempo Real
+        if (telemetryRut) telemetryRut.textContent = data.rut_id || 'NO DETECTADO';
+        if (telemetryCity) telemetryCity.textContent = data.city || 'NO ESPECIFICADA EN CV';
+        if (telemetryExp) {
+          const m = data.experience_months !== null && data.experience_months !== undefined ? data.experience_months : 0;
+          telemetryExp.textContent = `${data.experience_years || 0} AÑOS (${m} MESES EFECTIVOS)`;
+        }
+        if (telemetryCred) {
+          telemetryCred.textContent = `${data.credencial_status || 'VERIFICADA'} (${data.credencial_vigencia || 'VIGENTE'})`;
+        }
+
         ocrLiveBanner.className = 'ocr-banner ocr-banner-done';
         ocrLiveIcon.textContent = '[OCR OK]';
         ocrLiveText.textContent = `OCR Fase 1 completado (${data.credencial_status || 'Documento procesado'} — ${data.credencial_vigencia || 'Vigente'}). Verifique sus datos abajo o edite cualquier campo si es necesario.`;
@@ -244,25 +424,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  fileCredencial.addEventListener('change', async (e) => {
-    if (e.target.files[0]) {
-      state.credencialBase64 = await fileToBase64(e.target.files[0]);
-      credencialStatus.textContent = `Credencial cargada: ${e.target.files[0].name}`;
-      credencialStatus.style.color = '#10b981';
+  // Fase 1: Credencial Técnica
+  setupIndustrialDropzone({
+    dropzoneId: 'dropzone-credencial',
+    inputId: 'file-credencial',
+    onFileSelected: async (file) => {
+      state.credencialBase64 = await fileToBase64(file);
+      credencialStatus.textContent = `Credencial cargada: ${file.name}`;
+      credencialStatus.style.color = 'var(--ecf-emerald)';
       await triggerPhase1OCR();
+    },
+    onFileCleared: () => {
+      state.credencialBase64 = null;
+      credencialStatus.textContent = '[ESCANEO ACTIVO: Carnet Rigger, WPQ o Licencia D]';
+      credencialStatus.style.color = '';
     }
   });
 
-  fileCv.addEventListener('change', async (e) => {
-    if (e.target.files[0]) {
-      state.cvBase64 = await fileToBase64(e.target.files[0]);
-      cvStatus.textContent = `CV cargado: ${e.target.files[0].name}`;
-      cvStatus.style.color = '#10b981';
+  // Fase 1: Currículum Vitae (CV)
+  setupIndustrialDropzone({
+    dropzoneId: 'dropzone-cv',
+    inputId: 'file-cv',
+    onFileSelected: async (file) => {
+      state.cvBase64 = await fileToBase64(file);
+      cvStatus.textContent = `CV cargado: ${file.name}`;
+      cvStatus.style.color = 'var(--ecf-emerald)';
       await triggerPhase1OCR();
+    },
+    onFileCleared: () => {
+      state.cvBase64 = null;
+      cvStatus.textContent = '[ESCANEO ACTIVO: CV en PDF o Imagen (Contacto y Fechas)]';
+      cvStatus.style.color = '';
     }
   });
 
-  // Marcar edición manual por el candidato
+  // Marcar edición manual por el candidato y actualizar telemetría
   function bindManualEdit(inputEl, hintEl, label) {
     if (!inputEl) return;
     inputEl.addEventListener('input', () => {
@@ -272,6 +468,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (hintEl) {
         hintEl.textContent = `${label} editado/confirmado manualmente`;
         hintEl.style.color = 'var(--secondary)';
+      }
+      if (inputEl === rutInput && telemetryRut) {
+        telemetryRut.textContent = rutInput.value.trim() || 'NO DETECTADO';
+      }
+      if (inputEl === cityInput && telemetryCity) {
+        telemetryCity.textContent = cityInput.value.trim() || 'NO ESPECIFICADA';
+      }
+      if (inputEl === expInput && telemetryExp) {
+        telemetryExp.textContent = `${expInput.value || 0} AÑOS (MANUAL)`;
       }
     });
   }
@@ -412,6 +617,16 @@ document.addEventListener('DOMContentLoaded', () => {
     qCurrent.textContent = index + 1;
     questionText.textContent = q.question_text;
 
+    const isSjt = q.category === 'SJT';
+    const catHtml = isSjt
+      ? `<span class="mining-tag" style="background: rgba(255, 184, 0, 0.15); color: var(--safety-yellow); border-color: var(--safety-yellow); margin-bottom: 0.5rem; display: inline-block;">[CASO SJT: SEGURIDAD CRÍTICA / ECF CODELCO]</span><br>`
+      : `<span class="mining-tag" style="color: var(--text-secondary); margin-bottom: 0.5rem; display: inline-block;">[IDONEIDAD TÉCNICA ESPECÍFICA]</span><br>`;
+
+    const progressEl = document.querySelector('.question-progress');
+    if (progressEl) {
+      progressEl.innerHTML = `${catHtml}Pregunta ${index + 1} de ${state.questions.length}`;
+    }
+
     optionsContainer.innerHTML = [
       { key: 'A', text: q.option_a },
       { key: 'B', text: q.option_b },
@@ -494,16 +709,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.candidateId = data.candidateId;
 
-      if (data.qualifiedForPhase2) {
-        // Pasa a Fase 2: Pre-Acreditación Formal (Solicitar Carnet + Antecedentes)
-        phase1ScoreBadge.textContent = `${data.score}/${data.totalQuestions} (${data.scorePercent}%)`;
-        goToStep(3);
-      } else {
-        // DESCARTADO_TECNICO: Mostrar feedback inmediato sin pedir Carnet ni Antecedentes
-        finalIcon.textContent = 'ESTADO: DESCARTADO TÉCNICO';
-        finalIcon.className = 'status-pill status-Rechazado';
-        finalTitle.textContent = 'Resultado Filtro Técnico: No Califica en esta Convocatoria';
-        finalSubtitle.textContent = 'Su postulación no alcanzó el umbral técnico o de experiencia exigido por los Estándares de Control de Fatalidades (ECF) para esta parada de planta.';
+      if (data.status === 'PRESELECCIONADO') {
+        // PRESELECCIONADO: Evaluación técnica aprobada, en espera de aprobación de cupo por RR.HH.
+        finalIcon.textContent = 'ESTADO: PRESELECCIONADO TÉCNICAMENTE';
+        finalIcon.className = 'status-pill status-Aprobado';
+        finalTitle.textContent = 'Evaluación Técnica Aprobada — En Espera de Cupo para Faena';
+        finalSubtitle.textContent = 'Su postulación ha sido calificada conforme y se encuentra en revisión por el equipo de RR.HH. de Nexxo S.A. para asignación de cupo en División El Teniente.';
+        
         resultSummary.innerHTML = `
           <div class="info-grid">
             <div class="info-item">
@@ -511,20 +723,65 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="value">#${data.candidateId}</span>
             </div>
             <div class="info-item">
-              <span class="label">Resultado Mini-Test</span>
-              <span class="value">${data.score} / ${data.totalQuestions} (${data.scorePercent}% — Mínimo 80%)</span>
+              <span class="label">Score Técnico</span>
+              <span class="value">[${data.score_tecnico}/3]</span>
             </div>
             <div class="info-item">
-              <span class="label">Estado Máquina de Estados</span>
-              <span class="status-pill status-Rechazado">${data.status}</span>
+              <span class="label">Índice Conductual ECF</span>
+              <span class="value" style="color: var(--ecf-emerald); font-weight: 800;">
+                [CONFORME (2/2)]
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="label">Veredicto Técnico</span>
+              <span class="status-pill status-Aprobado">[PRESELECCIONADO]</span>
             </div>
           </div>
-          <div style="margin-top: 1.25rem; text-align: left; background: var(--status-error-bg); border: 1px solid var(--status-error-border); color: var(--status-error-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.9rem;">
-            <strong>Motivo técnico del descarte automático:</strong><br>
-            ${(data.rejectionReasons || []).join('<br>')}
+
+          <div style="margin-top: 1.25rem; text-align: left; background: var(--surface-panel); border: 1px solid var(--safety-yellow); border-left: 4px solid var(--safety-yellow); color: var(--text-primary); padding: 1.25rem; border-radius: var(--radius-terminal); font-size: 0.88rem; font-family: 'JetBrains Mono', monospace;">
+            <strong style="color: var(--safety-yellow);">ETAPA ACTUAL: ASIGNACIÓN DE DOTACIÓN POR RR.HH.</strong><br><br>
+            Ha calificado técnicamente para la parada de planta en <strong>División El Teniente</strong>.<br><br>
+            <strong>Próximos Pasos Normativos:</strong><br>
+            1. El equipo de Reclutamiento y Acreditación de Nexxo S.A. validará los cupos de dotación disponibles.<br>
+            2. Una vez <strong>aprobado su acceso a faena</strong>, recibirá automáticamente un <strong>enlace de acceso seguro (Magic Link)</strong> en su correo electrónico (<strong>${state.candidateData.email || 'declarado'}</strong>).<br>
+            3. Mediante ese enlace exclusivo podrá ingresar a la <strong>Fase 02 (Validación Documental)</strong> para adjuntar su Cédula de Identidad y Certificado de Antecedentes (Vigencia &le; 60 días).<br><br>
+            <em>En estricto cumplimiento de la Ley N° 19.628 y la normativa laboral de la Dirección del Trabajo, su documentación penal no es requerida hasta que cuente con aprobación formal de cupo de faena.</em>
           </div>
-          <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.85rem;">
-            En cumplimiento de la normativa laboral chilena (Dirección del Trabajo y Ley N° 19.628), no se le ha solicitado Cédula de Identidad ni Certificado de Antecedentes Penales.
+        `;
+        goToStep(4);
+      } else {
+        // DESCARTADO_TECNICO: Mostrar feedback normativo inmediato sin pedir Carnet ni Antecedentes
+        finalIcon.textContent = 'ESTADO: DESCARTADO TÉCNICO';
+        finalIcon.className = 'status-pill status-Rechazado';
+        finalTitle.textContent = 'Resultado Filtro Técnico: No Califica en esta Convocatoria';
+        finalSubtitle.textContent = 'Su postulación no alcanzó el umbral técnico o de apego a normas de seguridad crítica exigido por los ECF de Codelco.';
+        resultSummary.innerHTML = `
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">Folio Postulación</span>
+              <span class="value">#${data.candidateId}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Score Técnico</span>
+              <span class="value">[${data.score_tecnico}/3]</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Índice Conductual ECF</span>
+              <span class="value" style="color: ${data.sjt_conforme ? 'var(--ecf-emerald)' : 'var(--ecf-crimson)'}; font-weight: 800;">
+                [${data.sjt_conforme ? 'CONFORME (2/2)' : 'NO CONFORME'}]
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="label">Veredicto Final</span>
+              <span class="status-pill status-Rechazado">[${data.status}]</span>
+            </div>
+          </div>
+          <div style="margin-top: 1.25rem; text-align: left; background: var(--surface-panel); border: 1px solid var(--ecf-crimson-border); border-left: 4px solid var(--ecf-crimson); color: var(--text-primary); padding: 1rem; border-radius: var(--radius-terminal); font-size: 0.88rem; font-family: 'JetBrains Mono', monospace;">
+            <strong style="color: var(--ecf-crimson);">DIAGNÓSTICO DEL DESCARTE AUTOMÁTICO:</strong><br>
+            ${(data.rejectionReasons || []).map(r => `• ${r}`).join('<br>')}
+          </div>
+          <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.82rem; font-family: 'JetBrains Mono', monospace;">
+            En estricto cumplimiento de la normativa laboral (Dirección del Trabajo y Ley N° 19.628), no se le ha solicitado Cédula de Identidad ni Certificado de Antecedentes Penales.
           </p>
         `;
         goToStep(4);
@@ -538,27 +795,48 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 7. Fase 2 & 3: Subida de Carnet + Antecedentes y Motor OCR de Validación Cruzada
-  fileCarnetFront.addEventListener('change', async (e) => {
-    if (e.target.files[0]) {
-      state.carnetFrontBase64 = await fileToBase64(e.target.files[0]);
-      carnetFrontStatus.textContent = `Cédula Frente cargada: ${e.target.files[0].name}`;
-      carnetFrontStatus.style.color = '#10b981';
+  setupIndustrialDropzone({
+    dropzoneId: 'dropzone-carnet-front',
+    inputId: 'file-carnet-front',
+    onFileSelected: async (file) => {
+      state.carnetFrontBase64 = await fileToBase64(file);
+      carnetFrontStatus.textContent = `Cédula Frente cargada: ${file.name}`;
+      carnetFrontStatus.style.color = 'var(--ecf-emerald)';
+    },
+    onFileCleared: () => {
+      state.carnetFrontBase64 = null;
+      carnetFrontStatus.textContent = '[ESCANEO: Valida RUT, Nombre y Vigencia]';
+      carnetFrontStatus.style.color = '';
     }
   });
 
-  fileCarnetBack.addEventListener('change', async (e) => {
-    if (e.target.files[0]) {
-      state.carnetBackBase64 = await fileToBase64(e.target.files[0]);
-      carnetBackStatus.textContent = `Cédula Reverso cargada: ${e.target.files[0].name}`;
-      carnetBackStatus.style.color = '#10b981';
+  setupIndustrialDropzone({
+    dropzoneId: 'dropzone-carnet-back',
+    inputId: 'file-carnet-back',
+    onFileSelected: async (file) => {
+      state.carnetBackBase64 = await fileToBase64(file);
+      carnetBackStatus.textContent = `Cédula Reverso cargada: ${file.name}`;
+      carnetBackStatus.style.color = 'var(--ecf-emerald)';
+    },
+    onFileCleared: () => {
+      state.carnetBackBase64 = null;
+      carnetBackStatus.textContent = '[ESCANEO: Reverso del documento]';
+      carnetBackStatus.style.color = '';
     }
   });
 
-  fileAntecedentes.addEventListener('change', async (e) => {
-    if (e.target.files[0]) {
-      state.antecedentesBase64 = await fileToBase64(e.target.files[0]);
-      antecedentesStatus.textContent = `Cert. Antecedentes cargado: ${e.target.files[0].name}`;
-      antecedentesStatus.style.color = '#10b981';
+  setupIndustrialDropzone({
+    dropzoneId: 'dropzone-antecedentes',
+    inputId: 'file-antecedentes',
+    onFileSelected: async (file) => {
+      state.antecedentesBase64 = await fileToBase64(file);
+      antecedentesStatus.textContent = `Cert. Antecedentes cargado: ${file.name}`;
+      antecedentesStatus.style.color = 'var(--ecf-emerald)';
+    },
+    onFileCleared: () => {
+      state.antecedentesBase64 = null;
+      antecedentesStatus.textContent = '[REGISTRO CIVIL: Vigencia ≤ 60 días]';
+      antecedentesStatus.style.color = '';
     }
   });
 
@@ -647,5 +925,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  async function checkAccessTokenAndResume() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`/api/candidates/access/${encodeURIComponent(token)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`[ACCESO A FAENA NO AUTORIZADO]\n\n${data.error || 'El enlace no es válido o requiere aprobación de faena previa por parte de RR.HH.'}`);
+        return;
+      }
+
+      state.candidateId = data.id;
+      state.candidateData = data;
+
+      // Actualizar encabezado de Fase 2
+      phase1ScoreBadge.innerHTML = `
+        Postulante: <strong>${data.full_name}</strong> | 
+        RUT: <strong>${data.rut_id}</strong> | 
+        Cargo: <strong>${data.position_name}</strong> | 
+        Autorización: <strong style="color: var(--ecf-emerald);">[ACCESO A FAENA APROBADO]</strong>
+      `;
+
+      // Navegar a Fase 2 (Step 3)
+      goToStep(3);
+
+      // Desplegar aviso de sesión activa autorizada
+      const bannerContainer = document.createElement('div');
+      bannerContainer.className = 'ocr-banner ocr-banner-done';
+      bannerContainer.style.marginBottom = '1.25rem';
+      bannerContainer.innerHTML = `
+        <strong style="font-family: 'JetBrains Mono', monospace;">[ACCESO A FAENA APROBADO]</strong>
+        <span>Bienvenido/a <strong>${data.full_name}</strong>. Su cupo ha sido autorizado por RR.HH. Ingrese su Cédula y Certificado de Antecedentes para conformar su Carpeta WebControl Codelco.</span>
+      `;
+
+      const formPhase2El = document.getElementById('form-phase2');
+      if (formPhase2El && formPhase2El.parentNode) {
+        formPhase2El.parentNode.insertBefore(bannerContainer, formPhase2El);
+      }
+    } catch (e) {
+      console.error('[Error verificando token de acceso]:', e);
+    }
+  }
+
   loadPositions();
+  checkAccessTokenAndResume();
 });

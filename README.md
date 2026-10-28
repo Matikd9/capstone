@@ -13,17 +13,29 @@ Plataforma web diseñada para **Nexxo S.A.** (Especialistas en Mantenimiento Ind
   └─ Motor OCR extrae identidad, contacto, residencia y meses reales de experiencia
          │
          ▼ (Consentimiento explícito + Selfie de Validación Informada)
-[ FASE 1.5: MINI-TEST TÉCNICO + PROCTORING TRANSPARENTE ]
-  ├─ 5 preguntas técnicas de opción múltiple (40 segundos por pregunta)
-  ├─ Cámara visible en pantalla durante el examen (sin capturas ocultas)
-  └─ Filtro automático: exige nota >= 80% y experiencia mínima del ECF
+[ FASE 1.5: MINI-TEST TÉCNICO & JUICIO SITUACIONAL ECF + PROCTORING TRANSPARENTE ]
+  ├─ 5 preguntas en total: 3 de Idoneidad Técnica Específica + 2 de Juicio Situacional (SJT) sobre Seguridad Crítica
+  ├─ Cronómetro estricto de 40 segundos por pregunta y cámara visible con visor técnico
+  └─ Regla de corte normativo: Exige nota >= 80% (mínimo 4/5) Y aprobación total de SJT (2/2 en Seguridad Crítica / Paso Cero)
          │
-         ├── Si reprueba (< 80% o sin experiencia mínima) ──► [ DESCARTADO_TECNICO ]
+         ├── Si reprueba (< 80%, falla 1 SJT o sin experiencia mínima) ──► [ DESCARTADO_TECNICO ]
          │
-         ▼ Si aprueba (>= 80% y cumple experiencia ECF) ────► [ PRESELECCIONADO ]
-[ FASE 2: PRE-ACREDITACIÓN DOCUMENTAL Y CRUCE BIOMÉTRICO / OCR ]
-  ├─ Carga de Cédula de Identidad (Frente y Reverso) + Certificado de Antecedentes
-  ├─ Cruce OCR: RUT y Nombre (Fase 1 vs. Cédula), Edad (18-75), Vigencia y Antecedentes
+         ▼ Si aprueba (>= 80%, 2/2 SJT y cumple experiencia ECF) ────────► [ PRESELECCIONADO ]
+                                                                                   │
+                                                                 (Pausa normativa: En espera de cupo de faena)
+                                                                 (RR.HH. audita expediente en panel admin)
+                                                                                   │
+                                                                                   ▼ [ APROBAR ACCESO A FAENA ]
+                                                                          [ APROBADO_FAENA ]
+                                                                                   │
+                                                          (Despacho de Magic Link / Token único por Email)
+                                                          (Candidato abre enlace exclusivo: /?token=...)
+                                                                                   │
+                                                                                   ▼
+[ FASE 2: PRE-ACREDITACIÓN DOCUMENTAL Y VALIDACIÓN CRUZADA OCR / VISIÓN ]
+  ├─ Acceso desbloqueado únicamente con autorización previa de faena
+  ├─ Carga de Cédula de Identidad (Frente y Reverso) + Certificado de Antecedentes en Dropzones Industriales
+  ├─ Cruce OCR / Gemini 1.5 Flash: RUT y Nombre (Fase 1 vs. Cédula), Vigencia y Antecedentes
   ├─ Contraste visual en Panel RR.HH.: Selfie del Mini-Test vs. Fotografía de Cédula
   └─ Emisión automática de Carpeta de Acreditación para sistema WebControl / Codelco
 ```
@@ -32,33 +44,24 @@ Plataforma web diseñada para **Nexxo S.A.** (Especialistas en Mantenimiento Ind
 
 ## 2. Características Principales
 
-### Cumplimiento Legal y Ético (Ley N° 19.628)
+### Cumplimiento Legal y Ético (Ley N° 19.628 y Dirección del Trabajo)
 * **Proctoring Transparente Informado:** Se eliminó cualquier captura encubierta o grabación de audio improvisado. El postulante visualiza su cámara en todo momento y otorga consentimiento explícito antes de capturar la Selfie de Validación Informada.
-* **Recolección Progresiva de Datos Sensibles:** La Cédula de Identidad y el Certificado de Antecedentes solo se solicitan en la **Fase 2** a quienes ya aprobaron el filtro curricular y técnico (`PRESELECCIONADO`).
+* **Bloqueo Estricto de Fase 2 y Despacho Asíncrono de Magic Link:** En estricto cumplimiento de la normativa laboral de la Dirección del Trabajo y la Ley N° 19.628, la Cédula de Identidad y el Certificado de Antecedentes **permanecen estrictamente bloqueados** al terminar el test. El postulante aprobado queda en estado `PRESELECCIONADO` y solo cuando RR.HH. autoriza formalmente el cupo de faena (`APROBADO_FAENA`), el sistema emite un token criptográfico único (Magic Link válido por 7 días) y le notifica por correo para reanudar la Fase 2 sin necesidad de crear contraseñas.
 
-### Motor OCR Contextual y Reglas Anti-Ruido (`src/server.js`)
-* **Extracción Híbrida PDF + Imagen:**
-  * Uso de `pdftotext -raw` (Poppler) para preservar el orden de lectura por bloques en CVs digitales de múltiples columnas (ej. plantillas de Canva o Word) sin mezclar columnas horizontalmente.
-  * Uso de `tesseract-ocr` (`spa+eng`) con preprocesamiento de imagen (`sharp`: escala de grises, normalización de contraste, nitidez, umbralización y rotación automática 90°/180°/270°) para fotografías de credenciales y cédulas tomadas desde teléfonos móviles.
-* **Segmentación Semántica de CV (`splitCvIntoSections`):**
-  * Clasifica automáticamente el contenido del CV en `HEADER`, `CONTACTO`, `PERFIL`, `EXPERIENCIA`, `EDUCACION`, `HABILIDADES`, `CARACTERISTICAS`, `CURSOS` y `REFERENCIAS`.
-* **Bloqueo de Nombres de Universidades e Instituciones:**
-  * Descarta falsos positivos provenientes de casas de estudio (ej. *Universidad Adolfo Ibáñez*, *INACAP*, *DUOC UC*, *USM*), cargos operativos, términos técnicos y metadatos internos de archivos PDF.
-* **Detección Estricta de Ciudad de Residencia:**
-  * Extrae la ciudad o comuna exclusivamente desde el encabezado personal (`HEADER`), bloque de `CONTACTO` o etiquetas explícitas (`Ciudad:`, `Comuna:`, `Residencia:`, `Domicilio:`), ignorando comunas mencionadas dentro de `EXPERIENCIA` como lugar de faenas o bodegas anteriores (ej. *Lampa*). Si el CV no indica domicilio, el campo queda vacío para ingreso manual.
-* **Cálculo Real de Experiencia Laboral (`calculateExperienceFromSections`):**
-  * Suma los meses efectivamente trabajados en los rangos de fechas dentro de la sección `EXPERIENCIA`, excluyendo prácticas estudiantiles (`Práctica operaria / profesional`) e ignorando los años de estudio de la sección `EDUCACION`.
-* **Aislamiento de Referencias y Validación Módulo 11 (`isValidChileanRutMod11`):**
-  * Ignora por completo la sección `REFERENCIAS` para evitar extraer nombres, teléfonos o correos de antiguos jefes como si fueran del candidato, y valida matemáticamente el dígito verificador Módulo 11 en cada RUT detectado.
+### Motor OCR Multimodal con Gemini 1.5 Flash (`src/geminiOcr.js`)
+* **Extracción Estructurada Directa (JSON Schema):** Si se configura `GEMINI_API_KEY`, el motor delega el procesamiento visual a Gemini 1.5 Flash mediante REST, extrayendo sin consumo de CPU del servidor los campos normalizados de RUT, Nombres, Comuna, Meses de Experiencia y Vigencia de Credenciales.
+* **Validación Cruzada de Identidad (Fase 2):** Realiza el cruce de consistencia entre Cédula, Certificado del Registro Civil y datos de Fase 1, detectando discrepancias o antecedentes penales.
+* **Fallback Automático Local:** Si la API Key no está configurada, el sistema recurre de forma transparente al motor local basado en Poppler (`pdftotext -raw`) y Tesseract.js.
 
 ### Máquina de Estados de Candidatos (MySQL)
 1. `POSTULANDO`: Registro inicial en proceso.
-2. `PRESELECCIONADO`: Aprueba filtro de experiencia ECF y obtiene $\ge 80\%$ en el Mini-Test Técnico; habilitado para Fase 2.
-3. `DESCARTADO_TECNICO`: No alcanza el puntaje mínimo o la experiencia exigida por el estándar ECF.
-4. `DOCS_CARGADOS`: Documentación de Fase 2 recibida en espera de validación.
-5. `PRE_ACREDITADO`: Cruce OCR 100% consistente entre Fase 1 y Fase 2 (RUT, nombre, cédula vigente y antecedentes limpios).
-6. `EN_REVISION_MANUAL`: Discrepancia detectada por el motor OCR (ej. discordancia de RUT/nombre, documento vencido o edición manual) derivada a auditoría de RR.HH.
-7. `CONTRATADO` / `RECHAZADO`: Decisión final del reclutador con generación de carpeta lista para **WebControl**.
+2. `PRESELECCIONADO`: Aprueba filtro de experiencia ECF, obtiene $\ge 80\%$ en el Mini-Test Técnico y 2/2 en Juicio Situacional (SJT); en espera de asignación de cupo por RR.HH.
+3. `DESCARTADO_TECNICO`: No alcanza el puntaje mínimo, falla cualquiera de las 2 preguntas de seguridad crítica (SJT / Paso Cero) o no cumple la experiencia exigida por el estándar ECF.
+4. `APROBADO_FAENA`: RR.HH. autorizó el cupo del candidato en faena y despachó el Magic Link por correo para desbloquear la Fase 2.
+5. `DOCS_CARGADOS`: Documentación de Fase 2 recibida mediante el enlace de acceso seguro.
+6. `PRE_ACREDITADO`: Cruce OCR 100% consistente entre Fase 1 y Fase 2 (RUT, nombre, cédula vigente y antecedentes limpios).
+7. `EN_REVISION_MANUAL`: Discrepancia detectada por el motor OCR (ej. discordancia de RUT/nombre, documento vencido o edición manual) derivada a auditoría de RR.HH.
+8. `CONTRATADO_FAENA`: Asignación definitiva a la parada de planta en División El Teniente con Carpeta WebControl.
 
 ---
 

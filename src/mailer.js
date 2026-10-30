@@ -1,9 +1,12 @@
 /**
  * Módulo de Notificaciones y Enlaces Mágicos de Acreditación (Nexxo S.A. / Codelco)
  * Gestiona la emisión de tokens de acceso criptográficos y despacho de correos para Fase 2.
+ * Soporta envío real mediante SMTP (Gmail con Contraseña de Aplicación o SMTP corporativo)
+ * y fallback automático a simulador de consola.
  */
 
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 /**
  * Genera un token criptográfico seguro y su fecha de expiración (7 días corridos)
@@ -15,8 +18,34 @@ function generateAccessToken(validDays = 7) {
 }
 
 /**
+ * Retorna el transporte SMTP configurado o null si no hay credenciales
+ */
+function getMailTransporter() {
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!user || !pass || user.trim() === '' || pass.trim() === '') {
+    return null;
+  }
+
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.SMTP_PORT || '465', 10);
+  const secure = process.env.SMTP_SECURE === 'false' ? false : (port === 465);
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user: user.trim(),
+      pass: pass.trim().replace(/\s+/g, '') // Elimina espacios accidentales en contraseñas de app
+    }
+  });
+}
+
+/**
  * Despacha el correo de invitación a Fase 2 (Validación Documental)
- * En entorno de desarrollo o sin SMTP configurado, registra el correo formateado en la consola.
+ * Envía correo real si SMTP_USER y SMTP_PASS están en .env; de lo contrario simula en consola.
  */
 async function sendPhase2InvitationEmail({
   email,
@@ -83,7 +112,35 @@ async function sendPhase2InvitationEmail({
 </html>
   `;
 
-  // Imprimir notificación visible en la consola del servidor para desarrollo
+  // Intento de envío SMTP real si hay configuración
+  const transporter = getMailTransporter();
+  if (transporter) {
+    try {
+      const fromAddress = process.env.SMTP_FROM || `"Nexxo S.A. Acreditaciones" <${process.env.SMTP_USER}>`;
+      const mailOptions = {
+        from: fromAddress,
+        to: candidateEmail,
+        subject: `[NEXXO S.A.] Aprobación de Acceso a Faena - Convocatoria El Teniente (${roleName})`,
+        html: htmlContent
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`\n[MAILER/SMTP] Correo real enviado exitosamente a ${candidateEmail}. ID: ${info.messageId}`);
+      return {
+        success: true,
+        sent: true,
+        simulated: false,
+        messageId: info.messageId,
+        recipient: candidateEmail,
+        magic_link,
+        expires_at
+      };
+    } catch (err) {
+      console.error(`\n[MAILER/SMTP ERROR] Error enviando correo real a ${candidateEmail}:`, err.message);
+    }
+  }
+
+  // Fallback a Simulador de Consola
   console.log('\n' + '='.repeat(82));
   console.log(' [SIMULADOR DE EMAIL - NOTIFICACIÓN DE APROBACIÓN DE FAENA]');
   console.log(` Para:      ${candidateEmail} (${candidateName})`);
@@ -91,15 +148,19 @@ async function sendPhase2InvitationEmail({
   console.log(` Asunto:    [NEXXO S.A.] Aprobación de Acceso a Faena - Convocatoria El Teniente`);
   console.log(` Enlace:    ${magic_link}`);
   console.log(` Expiración: ${formattedDate}`);
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log(' AVISO:     Para recepción real en bandeja, configure SMTP_USER y SMTP_PASS en .env');
+  }
   console.log('='.repeat(82) + '\n');
 
-  // Si existe configuración SMTP en variables de entorno, se podría invocar nodemailer aquí
   return {
     success: true,
+    sent: false,
     simulated: true,
     recipient: candidateEmail,
     magic_link,
-    expires_at
+    expires_at,
+    note: 'Configure SMTP_USER y SMTP_PASS en .env para entrega real a la bandeja'
   };
 }
 

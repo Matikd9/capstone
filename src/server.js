@@ -4,10 +4,11 @@ const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 const { createWorker } = require('tesseract.js');
-require('dotenv').config();
+require('dotenv').config({ override: true });
 
 const geminiOcr = require('./geminiOcr');
 const mailer = require('./mailer');
+const mammoth = require('mammoth');
 
 // Evitar que errores asíncronos internos de workers OCR tumben el proceso Node.js
 process.on('uncaughtException', (err) => {
@@ -359,6 +360,8 @@ function saveBase64File(base64Data, prefix = 'file', defaultExt = 'jpg') {
     if (matches && matches[1]) {
       const mime = matches[1].toLowerCase();
       if (mime.includes('pdf')) extension = 'pdf';
+      else if (mime.includes('wordprocessingml') || mime.includes('docx')) extension = 'docx';
+      else if (mime.includes('msword') || mime.includes('doc')) extension = 'doc';
       else if (mime.includes('png')) extension = 'png';
       else if (mime.includes('webp')) extension = 'webp';
       else if (mime.includes('jpeg') || mime.includes('jpg')) extension = 'jpg';
@@ -1420,7 +1423,7 @@ async function runTesseractOnFiles(fileItems) {
     const validItems = (fileItems || []).filter(item => {
       if (!item || !item.filePath || !fs.existsSync(item.filePath)) return false;
       const ext = path.extname(item.filePath).toLowerCase();
-      return ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.pdf'].includes(ext);
+      return ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.pdf', '.docx', '.doc'].includes(ext);
     });
 
     if (validItems.length === 0) {
@@ -1450,7 +1453,15 @@ async function runTesseractOnFiles(fileItems) {
         const ext = path.extname(item.filePath).toLowerCase();
         let extractedText = '';
 
-        if (ext === '.pdf') {
+        if (ext === '.docx' || ext === '.doc') {
+          console.log(`[DOCX] Extrayendo texto íntegro de Word (${item.type}): ${path.basename(item.filePath)}...`);
+          try {
+            const docxRes = await mammoth.extractRawText({ path: item.filePath });
+            extractedText = (docxRes.value || '').trim();
+          } catch (mErr) {
+            console.error('[DOCX Extraction Error]:', mErr.message);
+          }
+        } else if (ext === '.pdf') {
           console.log(`[OCR/PDF] Extrayendo texto de PDF (${item.type}): ${path.basename(item.filePath)}...`);
           extractedText = extractTextFromPdfWithPoppler(item.filePath);
           if (!extractedText || extractedText.length < 15) {
@@ -1555,8 +1566,14 @@ app.post('/api/ocr/phase1', async (req, res) => {
         });
 
         return res.json({
+          ocr_engine: 'GEMINI_FLASH',
           full_name: geminiData.full_name || '',
           rut_id: geminiData.rut_id || '',
+          rut_source: geminiData.rut_source || (geminiData.rut_id ? 'CV' : 'NO_DETECTADO'),
+          rut_credencial: geminiData.rut_credencial || null,
+          rut_cv: geminiData.rut_cv || null,
+          rut_discrepancia: Boolean(geminiData.rut_discrepancia),
+          discrepancia_nota: geminiData.discrepancia_nota || null,
           email: geminiData.email || '',
           phone: geminiData.phone || '',
           city: geminiData.city || '',
@@ -1564,7 +1581,7 @@ app.post('/api/ocr/phase1', async (req, res) => {
           experience_months: geminiData.experience_months ?? null,
           credencial_status: geminiData.credencial_status || 'Documento Técnico Verificado',
           credencial_vigencia: geminiData.credencial_vigencia || 'Vigente',
-          ocr_text: `[MOTOR: GEMINI 1.5 FLASH]\nPerfil: ${geminiData.resumen_perfil || 'Acreditación técnica conforme'}\nCredencial: ${geminiData.credencial_status} (${geminiData.credencial_vigencia})`
+          ocr_text: `[MOTOR: GEMINI FLASH]\nPerfil: ${geminiData.resumen_perfil || 'Acreditación técnica conforme'}\nCredencial: ${geminiData.credencial_status} (${geminiData.credencial_vigencia})${geminiData.rut_source ? `\nFuente RUT: ${geminiData.rut_source}` : ''}`
         });
       } catch (geminiErr) {
         console.warn('[OCR/Gemini Fallback] Excepción en Gemini, recurriendo a motor local:', geminiErr.message);
@@ -1591,14 +1608,45 @@ app.post('/api/ocr/phase1', async (req, res) => {
     const cred = parsedByType.CREDENCIAL_TECNICA || {};
     const cv = parsedByType.CV || {};
 
-    const bestName = pickBestPersonName(
-      [cred.detected_name, cv.detected_name],
-      cv.detected_email || cred.detected_email
-    ) || '';
+    const rutCred = cred.detected_rut || null;
+    const rutCv = cv.detected_rut || null;
+    let rutId = rutCv;
+    let rutSource = 'CV';
+    let rutDiscrepancy = false;
+    let discrepancyNote = null;
+
+    if (!rutCv && rutCred) {
+      rutId = rutCred;
+      rutSource = 'CREDENCIAL';
+    } else if (rutCv && rutCred) {
+      const cleanCv = rutCv.replace(/[^0-9kK]/g, '').toUpperCase();
+      const cleanCred = rutCred.replace(/[^0-9kK]/g, '').toUpperCase();
+      if (cleanCv !== cleanCred) {
+        rutDiscrepancy = true;
+        discrepancyNote = `Discrepancia detectada: RUT en CV (${rutCv}) difiere de Licencia/Credencial (${rutCred}).`;
+        rutId = rutCred; // Prioridad oficial
+        rutSource = 'DISCREPANCIA';
+      } else {
+        rutSource = 'AMBOS_COINCIDENTES';
+      }
+    } else if (!rutCv && !rutCred) {
+      rutSource = 'NO_DETECTADO';
+      rutId = '';
+    }
+
+    const bestName = (rutSource === 'CREDENCIAL' && cred.detected_name)
+      ? cred.detected_name
+      : pickBestPersonName([cred.detected_name, cv.detected_name], cv.detected_email || cred.detected_email) || '';
 
     res.json({
+      ocr_engine: 'LOCAL_TESSERACT',
       full_name: bestName,
-      rut_id: cred.detected_rut || cv.detected_rut || '',
+      rut_id: rutId,
+      rut_source: rutSource,
+      rut_credencial: rutCred,
+      rut_cv: rutCv,
+      rut_discrepancia: rutDiscrepancy,
+      discrepancia_nota: discrepancyNote,
       email: cv.detected_email || cred.detected_email || '',
       phone: cv.detected_phone || cred.detected_phone || '',
       city: cv.detected_city || '',
@@ -1756,6 +1804,11 @@ app.post('/api/candidates/phase1-submit', async (req, res) => {
       editedFields.push(`RUT Fase 1 (OCR: ${ocrDetectedRut})`);
     }
 
+    const discrepancyNotesList = [...rejectionReasons];
+    if (phase1_ocr_data && phase1_ocr_data.rut_discrepancia && phase1_ocr_data.discrepancia_nota) {
+      discrepancyNotesList.push(`[AUDITORÍA DOCUMENTAL FASE 1]: ${phase1_ocr_data.discrepancia_nota}`);
+    }
+
     const [candRes] = await pool.query(
       `INSERT INTO candidates 
       (full_name, rut_id, email, phone, city, experience_years, age, position_id, cv_file, credencial_file, cert_file, initial_selfie, score, total_questions, score_tecnico, score_sjt, sjt_conforme, status, ocr_text, ocr_detected_name, ocr_detected_rut, ocr_credencial_status, ocr_manually_edited, ocr_edited_fields, discrepancy_notes, consent_proctoring)
@@ -1785,7 +1838,7 @@ app.post('/api/candidates/phase1-submit', async (req, res) => {
         ocrCredStatus,
         editedFields.length > 0 ? 1 : 0,
         editedFields.join(' | ') || null,
-        rejectionReasons.join(' ') || null,
+        discrepancyNotesList.join(' | ') || null,
         consent_proctoring ? 1 : 0
       ]
     );
@@ -1889,7 +1942,7 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
           if (g2.discrepancy_notes && !crossCheckOk) {
             discrepancies.push(g2.discrepancy_notes);
           }
-          combinedText = `[MOTOR: GEMINI 1.5 FLASH]\nCédula: ${ocrCarnetName} (${ocrCarnetRut}) - ${ocrCarnetVigencia}\nAntecedentes: ${ocrAntecedentesStatus}\nCruce Identidad: ${crossCheckOk ? 'CONFORME' : 'CON DISCORDANCIAS'}`;
+          combinedText = `[MOTOR: GEMINI FLASH]\nCédula: ${ocrCarnetName} (${ocrCarnetRut}) - ${ocrCarnetVigencia}\nAntecedentes: ${ocrAntecedentesStatus}\nCruce Identidad: ${crossCheckOk ? 'CONFORME' : 'CON DISCORDANCIAS'}`;
         }
       } catch (geminiErr) {
         console.warn('[OCR/Gemini Fallback Phase 2]:', geminiErr.message);
@@ -2125,7 +2178,7 @@ app.post('/api/admin/candidates/:id/approve-faena', async (req, res) => {
     const host = req.get('host');
     const magicLink = `${protocol}://${host}/?token=${token}`;
 
-    await mailer.sendPhase2InvitationEmail({
+    const mailResult = await mailer.sendPhase2InvitationEmail({
       email: candidate.email,
       full_name: candidate.full_name,
       position_name: candidate.position_name,
@@ -2139,7 +2192,11 @@ app.post('/api/admin/candidates/:id/approve-faena', async (req, res) => {
       candidate_id: Number(id),
       new_status: 'APROBADO_FAENA',
       magic_link: magicLink,
-      expires_at: expiresAt
+      expires_at: expiresAt,
+      mail_sent: Boolean(mailResult.sent),
+      mail_simulated: Boolean(mailResult.simulated),
+      mail_recipient: mailResult.recipient,
+      mail_note: mailResult.note || null
     });
   } catch (err) {
     console.error('[Error /api/admin/candidates/:id/approve-faena]:', err);

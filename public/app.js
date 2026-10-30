@@ -191,13 +191,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function validateAndProcess(file) {
       if (!file) return;
 
-      const validExtensions = /\.(pdf|jpe?g|png|webp|bmp)$/i;
-      const isMimeValid = file.type === 'application/pdf' || file.type.startsWith('image/');
+      const validExtensions = /\.(pdf|jpe?g|png|webp|bmp|docx?)$/i;
+      const isWordMime = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.type === 'application/msword';
+      const isMimeValid = file.type === 'application/pdf' || file.type.startsWith('image/') || isWordMime;
       const isExtValid = validExtensions.test(file.name);
 
       if (!isMimeValid && !isExtValid) {
         resetToEmpty();
-        showError('[ERROR DE FORMATO]: Solo se admiten archivos PDF, JPG o PNG');
+        showError('[ERROR DE FORMATO]: Solo se admiten archivos PDF, DOCX, JPG o PNG');
         return;
       }
 
@@ -349,14 +350,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (data.full_name && !fullNameInput.dataset.edited) {
           fullNameInput.value = formatTitleCase(data.full_name);
-          hintName.textContent = 'Nombre extraído automáticamente por OCR';
+          if (data.rut_source === 'CREDENCIAL') {
+            hintName.textContent = 'Nombre legal oficial rescatado desde Licencia / Credencial Técnica';
+          } else {
+            hintName.textContent = 'Nombre extraído automáticamente por OCR';
+          }
           hintName.style.color = 'var(--status-normal-text)';
         }
+
         if (data.rut_id && !rutInput.dataset.edited) {
           rutInput.value = data.rut_id;
-          hintRut.textContent = 'RUT extraído por OCR (Se cruzará en Fase 2)';
-          hintRut.style.color = 'var(--status-normal-text)';
+          if (data.rut_discrepancia) {
+            hintRut.textContent = `[DISCREPANCIA: RUT en CV (${data.rut_cv || 'S/I'}) difiere de Licencia/Credencial (${data.rut_credencial || 'S/I'})]`;
+            hintRut.style.color = 'var(--safety-yellow)';
+          } else if (data.rut_source === 'CREDENCIAL') {
+            hintRut.textContent = 'RUT rescatado automáticamente de Licencia / Credencial Técnica Habilitante';
+            hintRut.style.color = 'var(--status-normal-text)';
+          } else if (data.rut_source === 'AMBOS_COINCIDENTES') {
+            hintRut.textContent = 'RUT validado y coincidente en CV y Licencia/Credencial Técnica';
+            hintRut.style.color = 'var(--status-normal-text)';
+          } else {
+            hintRut.textContent = 'RUT extraído desde Currículum Vitae (Se contrastará en Fase 2)';
+            hintRut.style.color = 'var(--status-normal-text)';
+          }
         }
+
         if (data.email && !emailInput.dataset.edited) {
           emailInput.value = data.email;
           hintEmail.textContent = 'Correo detectado automáticamente en CV';
@@ -393,7 +411,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Actualizar Telemetría en Tiempo Real
-        if (telemetryRut) telemetryRut.textContent = data.rut_id || 'NO DETECTADO';
+        if (telemetryRut) {
+          if (data.rut_id) {
+            const srcLabel = data.rut_source === 'CREDENCIAL' ? 'LICENCIA' : (data.rut_source === 'AMBOS_COINCIDENTES' ? 'VERIFICADO 2x' : (data.rut_source === 'DISCREPANCIA' ? 'DISCREPANCIA' : 'CV'));
+            telemetryRut.textContent = `${data.rut_id} [${srcLabel}]`;
+          } else {
+            telemetryRut.textContent = 'NO DETECTADO (INGRESO MANUAL)';
+          }
+        }
         if (telemetryCity) telemetryCity.textContent = data.city || 'NO ESPECIFICADA EN CV';
         if (telemetryExp) {
           const m = data.experience_months !== null && data.experience_months !== undefined ? data.experience_months : 0;
@@ -403,9 +428,17 @@ document.addEventListener('DOMContentLoaded', () => {
           telemetryCred.textContent = `${data.credencial_status || 'VERIFICADA'} (${data.credencial_vigencia || 'VIGENTE'})`;
         }
 
-        ocrLiveBanner.className = 'ocr-banner ocr-banner-done';
-        ocrLiveIcon.textContent = '[OCR OK]';
-        ocrLiveText.textContent = `OCR Fase 1 completado (${data.credencial_status || 'Documento procesado'} — ${data.credencial_vigencia || 'Vigente'}). Verifique sus datos abajo o edite cualquier campo si es necesario.`;
+        const engineLabel = (data.ocr_engine && data.ocr_engine.includes('GEMINI')) ? '[MOTOR: GEMINI FLASH]' : '[MOTOR: LOCAL TESSERACT]';
+        if (data.rut_discrepancia) {
+          ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
+          ocrLiveIcon.textContent = '[ATENCIÓN]';
+          ocrLiveText.textContent = `${engineLabel} Alerta: El RUT del CV (${data.rut_cv}) difiere de la Licencia/Credencial (${data.rut_credencial}). Se priorizó la Licencia Oficial. Verifique sus datos abajo.`;
+        } else {
+          ocrLiveBanner.className = 'ocr-banner ocr-banner-done';
+          ocrLiveIcon.textContent = '[OCR OK]';
+          const srcMsg = data.rut_source === 'CREDENCIAL' ? ' (RUT rescatado desde Licencia/Credencial)' : '';
+          ocrLiveText.textContent = `${engineLabel} OCR Fase 1 completado (${data.credencial_status || 'Documento procesado'} — ${data.credencial_vigencia || 'Vigente'})${srcMsg}. Verifique sus datos abajo o edite cualquier campo si es necesario.`;
+        }
       } else {
         ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
         ocrLiveIcon.textContent = '[AVISO]';
@@ -453,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     onFileCleared: () => {
       state.cvBase64 = null;
-      cvStatus.textContent = '[ESCANEO ACTIVO: CV en PDF o Imagen (Contacto y Fechas)]';
+      cvStatus.textContent = '[ESCANEO ACTIVO: CV en PDF, DOCX o Imagen (Contacto y Fechas)]';
       cvStatus.style.color = '';
     }
   });

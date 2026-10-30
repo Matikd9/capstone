@@ -15,6 +15,99 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalBody = document.getElementById('modal-body');
   const btnCloseModal = document.getElementById('btn-close-modal');
 
+  // Elementos de Scroll Sincronizado Superior
+  const tableTopScroll = document.getElementById('table-top-scroll');
+  const tableTopScrollInner = document.getElementById('table-top-scroll-inner');
+  const tableContainer = document.getElementById('table-container');
+  const dataTable = document.querySelector('.data-table');
+
+  function updateTopScrollWidth() {
+    if (!tableTopScrollInner || !dataTable) return;
+    tableTopScrollInner.style.width = `${dataTable.scrollWidth}px`;
+    if (tableTopScroll && tableContainer) {
+      if (dataTable.scrollWidth <= tableContainer.clientWidth) {
+        tableTopScroll.style.display = 'none';
+      } else {
+        tableTopScroll.style.display = 'block';
+      }
+    }
+  }
+
+  let isSyncingTop = false;
+  let isSyncingBottom = false;
+
+  if (tableTopScroll && tableContainer) {
+    tableTopScroll.addEventListener('scroll', () => {
+      if (isSyncingBottom) return;
+      isSyncingTop = true;
+      tableContainer.scrollLeft = tableTopScroll.scrollLeft;
+      requestAnimationFrame(() => { isSyncingTop = false; });
+    });
+
+    tableContainer.addEventListener('scroll', () => {
+      if (isSyncingTop) return;
+      isSyncingBottom = true;
+      tableTopScroll.scrollLeft = tableContainer.scrollLeft;
+      requestAnimationFrame(() => { isSyncingBottom = false; });
+    });
+
+    window.addEventListener('resize', updateTopScrollWidth);
+  }
+
+  // Sistema de Notificaciones Toast Industriales
+  function showToast(message, type = 'success', durationMs = 4500) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const item = document.createElement('div');
+    item.className = `toast-item toast-${type}`;
+
+    const iconTag = type === 'success' ? '[OK]' : (type === 'warn' ? '[AVISO]' : '[ERROR]');
+    item.innerHTML = `
+      <span class="toast-icon">${iconTag}</span>
+      <span>${escapeHtml(message)}</span>
+    `;
+
+    container.appendChild(item);
+
+    setTimeout(() => {
+      item.style.opacity = '0';
+      item.style.transform = 'translateX(30px)';
+      setTimeout(() => item.remove(), 300);
+    }, durationMs);
+  }
+  window.showToast = showToast;
+
+  // Copia de enlace Magic Link al portapapeles
+  window.copyMagicLinkToClipboard = async (url, btnElement) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const tempInput = document.createElement('textarea');
+        tempInput.value = url;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+      }
+      showToast('Enlace copiado exitosamente al portapapeles.', 'success');
+      if (btnElement) {
+        const orig = btnElement.textContent;
+        btnElement.textContent = '[ ENLACE COPIADO ]';
+        btnElement.style.borderColor = 'var(--ecf-emerald)';
+        btnElement.style.color = 'var(--ecf-emerald)';
+        setTimeout(() => {
+          btnElement.textContent = orig;
+          btnElement.style.borderColor = '';
+          btnElement.style.color = '';
+        }, 2500);
+      }
+    } catch (err) {
+      showToast('No se pudo copiar automáticamente. Use Ctrl+C.', 'warn');
+    }
+  };
+
   function getStatusPillClass(status) {
     if (['PRE_ACREDITADO', 'CONTRATADO_FAENA', 'Aprobado'].includes(status)) {
       return 'status-Aprobado';
@@ -130,8 +223,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }).join('');
 
       window.currentCandidates = candidates;
+      updateTopScrollWidth();
     } catch (e) {
       candidatesTbody.innerHTML = `<tr><td colspan="9" class="loading-td">Error conectando con la base de datos</td></tr>`;
+      updateTopScrollWidth();
     }
   }
 
@@ -230,7 +325,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ${candidate.ocr_text ? `
           <details style="margin-top: 0.75rem; background: var(--surface-panel); padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid var(--border-structural);">
-            <summary style="cursor: pointer; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-secondary);">[VER LOG DE TEXTO EXTRAÍDO POR OCR]</summary>
+            <summary style="cursor: pointer; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between;">
+              <span>[VER LOG DE TEXTO EXTRAÍDO POR OCR]</span>
+              ${candidate.ocr_text.includes('[MOTOR: GEMINI') 
+                ? '<span class="badge" style="background: rgba(16,185,129,0.15); color: var(--ecf-emerald); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--ecf-emerald);">MOTOR: GEMINI FLASH</span>' 
+                : '<span class="badge" style="background: rgba(255,184,0,0.15); color: var(--safety-yellow); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--safety-yellow);">MOTOR: LOCAL TESSERACT</span>'}
+            </summary>
             <pre style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; margin-top: 0.5rem; max-height: 150px; overflow-y: auto; color: var(--text-primary);">${escapeHtml(candidate.ocr_text)}</pre>
           </details>
         ` : ''}
@@ -266,16 +366,30 @@ document.addEventListener('DOMContentLoaded', () => {
       ` : ''}
 
       ${candidate.status === 'APROBADO_FAENA' ? `
-        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid var(--ecf-emerald); padding: 1.15rem; border-radius: var(--radius-terminal); margin-top: 1rem; text-align: left;">
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 700; color: var(--ecf-emerald); margin-bottom: 0.35rem;">
-            [ACCESO A FAENA APROBADO — ENLACE FASE 2 ACTIVO]
+        <div class="modal-token-card">
+          <div class="modal-token-card-header">
+            <span>[ACCESO A FAENA APROBADO // ENLACE FASE 2 ACTIVO]</span>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: var(--ecf-emerald); font-size: 0.72rem; padding: 2px 8px; border-radius: 2px;">VÁLIDO 7 DÍAS</span>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-primary); margin: 0 0 0.85rem 0;">
-            El candidato cuenta con autorización de faena activa para cargar su Cédula y Certificado de Antecedentes (Fase 2).
+          <p style="font-size: 0.82rem; color: var(--text-primary); margin: 0 0 0.5rem 0;">
+            El candidato cuenta con autorización de faena activa para cargar su Cédula y Certificado de Antecedentes (Fase 2). Enlace despachado a <strong>${escapeHtml(candidate.email || 'correo')}</strong>.
           </p>
-          <button class="btn btn-secondary btn-sm" id="btn-approve-faena" onclick="approveFaena(${candidate.id})">
-            [ RE-ENVIAR / RE-GENERAR ENLACE FASE 2 ]
-          </button>
+          <div class="modal-token-link-box">
+            <span>${escapeHtml(candidate.access_token ? `${window.location.origin}/?token=${candidate.access_token}` : 'Enlace emitido en el sistema')}</span>
+          </div>
+          <div class="modal-token-actions">
+            ${candidate.access_token ? `
+              <button type="button" class="btn btn-secondary btn-sm" onclick="copyMagicLinkToClipboard('${window.location.origin}/?token=${candidate.access_token}', this)">
+                [ COPIAR ENLACE FASE 2 ]
+              </button>
+              <a href="${window.location.origin}/?token=${candidate.access_token}" target="_blank" class="btn btn-primary btn-sm" style="text-decoration: none;">
+                [ ABRIR FASE 2 DIRECTAMENTE ]
+              </a>
+            ` : ''}
+            <button type="button" class="btn btn-sm" style="border: 1px solid var(--border-structural); color: var(--text-secondary);" id="btn-approve-faena" onclick="approveFaena(${candidate.id})">
+              [ RE-DESPACHAR CORREO ]
+            </button>
+          </div>
         </div>
       ` : ''}
 
@@ -306,19 +420,25 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`/api/admin/candidates/${id}/approve-faena`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        alert(`Acceso a faena aprobado exitosamente.\n\nEnlace despachado al correo:\n${data.magic_link}`);
+        if (data.mail_sent) {
+          showToast(`[ÉXITO] Acceso autorizado. Correo enviado a ${data.mail_recipient || 'postulante'}.`, 'success');
+        } else if (data.mail_simulated) {
+          showToast(`[ACCESO APROBADO] Token generado (Modo simulador consola).`, 'warn');
+        } else {
+          showToast(`[ÉXITO] Acceso autorizado y Magic Link generado.`, 'success');
+        }
         await loadCandidates();
         await loadStats();
         window.viewCandidate(id);
       } else {
-        alert(`Error al aprobar acceso a faena: ${data.error}`);
+        showToast(`Error al aprobar acceso a faena: ${data.error}`, 'error');
         if (btn) {
           btn.disabled = false;
           btn.textContent = '[ APROBAR ACCESO A FAENA Y ENVIAR ENLACE FASE 2 ]';
         }
       }
     } catch (e) {
-      alert('Error de conexión al aprobar acceso a faena.');
+      showToast('Error de conexión al aprobar acceso a faena.', 'error');
       if (btn) {
         btn.disabled = false;
         btn.textContent = '[ APROBAR ACCESO A FAENA Y ENVIAR ENLACE FASE 2 ]';
@@ -335,14 +455,15 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`/api/admin/candidates/${id}/reprocess-ocr`, { method: 'POST' });
       if (res.ok) {
+        showToast('Expediente re-analizado correctamente por OCR.', 'success');
         await loadCandidates();
         await loadStats();
         window.viewCandidate(id);
       } else {
-        alert('Error al re-analizar OCR del expediente.');
+        showToast('Error al re-analizar OCR del expediente.', 'error');
       }
     } catch (e) {
-      alert('Error de conexión al re-analizar OCR.');
+      showToast('Error de conexión al re-analizar OCR.', 'error');
     }
   };
 
@@ -355,14 +476,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (res.ok) {
+        showToast(`Estado actualizado a ${status}.`, 'success');
         modalCandidate.style.display = 'none';
         loadCandidates();
         loadStats();
       } else {
-        alert('Error actualizando el estado en la máquina de estados.');
+        showToast('Error actualizando el estado en la máquina de estados.', 'error');
       }
     } catch (e) {
-      alert('Error de conexión.');
+      showToast('Error de conexión al actualizar estado.', 'error');
     }
   };
 

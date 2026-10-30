@@ -4,7 +4,9 @@
  * Extrae datos estructurados (JSON) directamente sin depender de Tesseract local.
  */
 
-const GEMINI_MODEL = 'gemini-1.5-flash';
+require('dotenv').config({ override: true });
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+const mammoth = require('mammoth');
 
 function isGeminiAvailable() {
   const key = process.env.GEMINI_API_KEY;
@@ -84,12 +86,39 @@ async function analyzePhase1Documents({ credencialBase64, cvBase64 }) {
 
   const systemInstruction = `
 Eres un auditor técnico y perito documental para acreditación en minería pesada en Chile (Nexxo S.A. / Codelco División El Teniente).
-Analiza los documentos adjuntos (Credencial Técnica Habilitante y/o Currículum Vitae del postulante).
+Analiza los documentos adjuntos:
+- DOCUMENTO 1 (si existe): Credencial Técnica Habilitante / Licencia de Conducir (Licencia Clase D, A, Carnet Rigger, WPQ Soldador, etc.).
+- DOCUMENTO 2 (si existe): Currículum Vitae (CV Técnico Laboral).
+
+REGLAS CRÍTICAS DE EXTRACCIÓN Y FUSIÓN DOCUMENTAL (CASCADA Y VALIDACIÓN CRUZADA):
+1. EXTRACCIÓN DE IDENTIDAD Y RUT:
+   - Extrae el RUT del postulante en formato chileno estándar "XX.XXX.XXX-X" o "X.XXX.XXX-X" con dígito verificador.
+   - Si el Currículum Vitae (CV) NO incluye el RUT, DEBES buscarlo y extraerlo obligatoriamente desde la Credencial Técnica / Licencia de Conducir / Certificado técnico adjunto (donde comúnmente figura como "RUT", "RUN", "Cédula", "N° Licencia" o bajo la fotografía).
+   - Identifica de forma precisa la fuente del RUT:
+     * "CREDENCIAL": Si se extrajo desde la Credencial / Licencia (porque el CV no lo tenía o solo se adjuntó credencial).
+     * "CV": Si se extrajo exclusivamente desde el CV.
+     * "AMBOS_COINCIDENTES": Si ambos documentos contienen el RUT y coinciden exactamente.
+     * "DISCREPANCIA": Si ambos documentos contienen un RUT pero difieren entre sí (posible suplantación o error de documento).
+     * "NO_DETECTADO": Si no se encuentra ningún RUT en ningún documento.
+   - En caso de DISCREPANCIA:
+     * Asigna 'rut_discrepancia': true.
+     * En 'rut_id', prioriza el RUT de la Credencial / Licencia oficial por tener mayor fe pública y fotografía.
+     * En 'discrepancia_nota', explica brevemente la diferencia (ej: "RUT en CV 12.345.678-5 difiere de Licencia 18.999.888-7").
+2. NOMBRE COMPLETO LEGAL:
+   - Si el RUT fue extraído de la Credencial Técnica / Licencia oficial, toma como 'full_name' el nombre legal completo que figure en dicha Credencial / Licencia (omitiendo cargos o membretes), ya que tiene validez oficial. Si solo hay CV, toma el nombre del CV sin títulos.
+3. DATOS DE CONTACTO Y EXPERIENCIA:
+   - Extrae email, teléfono, ciudad de residencia y experiencia laboral preferentemente desde el CV.
+
 Devuelve un JSON estrictamente estructurado con las siguientes claves:
 
 {
-  "full_name": string o null (Nombre completo del titular sin títulos como 'Ingeniero' o nombres de instituciones),
+  "full_name": string o null (Nombre legal completo del titular sin títulos como 'Ingeniero' o nombres de instituciones),
   "rut_id": string o null (RUT chileno con formato "XX.XXX.XXX-X" o "X.XXX.XXX-X" con dígito verificador),
+  "rut_source": "CREDENCIAL" | "CV" | "AMBOS_COINCIDENTES" | "DISCREPANCIA" | "NO_DETECTADO",
+  "rut_credencial": string o null (RUT detectado en Credencial/Licencia o null),
+  "rut_cv": string o null (RUT detectado en CV o null),
+  "rut_discrepancia": boolean (true si ambos existen y no coinciden),
+  "discrepancia_nota": string o null (Detalle de la discrepancia de RUT o nombre si existe),
   "email": string o null (Correo electrónico de contacto),
   "phone": string o null (Teléfono de contacto),
   "city": string o null (Comuna o ciudad de residencia indicada en el CV, ej: "Rancagua", "Machalí", "Santiago"),
@@ -120,15 +149,38 @@ Devuelve un JSON estrictamente estructurado con las siguientes claves:
   if (cvBase64) {
     const parsedCv = parseBase64Payload(cvBase64, 'application/pdf');
     if (parsedCv) {
-      parts.push({
-        text: 'DOCUMENTO 2: Currículum Vitae (CV Técnico Laboral):'
-      });
-      parts.push({
-        inlineData: {
-          mimeType: parsedCv.mimeType,
-          data: parsedCv.data
+      const mime = (parsedCv.mimeType || '').toLowerCase();
+      if (mime.includes('word') || mime.includes('docx') || mime.includes('officedocument') || mime.includes('msword')) {
+        try {
+          const buffer = Buffer.from(parsedCv.data, 'base64');
+          const docxResult = await mammoth.extractRawText({ buffer });
+          const textValue = (docxResult.value || '').trim();
+          parts.push({
+            text: `DOCUMENTO 2: Currículum Vitae (Texto extraído directamente de archivo Microsoft Word .DOCX):\n\n${textValue}`
+          });
+        } catch (docxErr) {
+          console.error('[Gemini OCR DOCX Error]:', docxErr.message);
+          parts.push({
+            text: 'DOCUMENTO 2: Currículum Vitae (CV Técnico Laboral):'
+          });
+          parts.push({
+            inlineData: {
+              mimeType: parsedCv.mimeType,
+              data: parsedCv.data
+            }
+          });
         }
-      });
+      } else {
+        parts.push({
+          text: 'DOCUMENTO 2: Currículum Vitae (CV Técnico Laboral):'
+        });
+        parts.push({
+          inlineData: {
+            mimeType: parsedCv.mimeType,
+            data: parsedCv.data
+          }
+        });
+      }
     }
   }
 
@@ -140,7 +192,25 @@ Devuelve un JSON estrictamente estructurado con las siguientes claves:
     text: 'Extrae con exactitud los datos solicitados en formato JSON según las instrucciones.'
   });
 
-  return await callGeminiGenerateContent(parts, systemInstruction);
+  const rawResult = await callGeminiGenerateContent(parts, systemInstruction);
+  return {
+    full_name: rawResult.full_name || null,
+    rut_id: rawResult.rut_id || null,
+    rut_source: rawResult.rut_source || (rawResult.rut_id ? 'CV' : 'NO_DETECTADO'),
+    rut_credencial: rawResult.rut_credencial || null,
+    rut_cv: rawResult.rut_cv || null,
+    rut_discrepancia: Boolean(rawResult.rut_discrepancia),
+    discrepancia_nota: rawResult.discrepancia_nota || null,
+    email: rawResult.email || null,
+    phone: rawResult.phone || null,
+    city: rawResult.city || null,
+    experience_years: typeof rawResult.experience_years === 'number' ? rawResult.experience_years : null,
+    experience_months: typeof rawResult.experience_months === 'number' ? rawResult.experience_months : null,
+    credencial_status: rawResult.credencial_status || 'Documento Técnico Verificado',
+    credencial_vigencia: rawResult.credencial_vigencia || 'Vigente',
+    es_conforme_tecnico: Boolean(rawResult.es_conforme_tecnico),
+    resumen_perfil: rawResult.resumen_perfil || ''
+  };
 }
 
 /**

@@ -428,7 +428,20 @@ document.addEventListener('DOMContentLoaded', () => {
           telemetryCred.textContent = `${data.credencial_status || 'VERIFICADA'} (${data.credencial_vigencia || 'VIGENTE'})`;
         }
 
-        const engineLabel = (data.ocr_engine && data.ocr_engine.includes('GEMINI')) ? '[MOTOR: GEMINI FLASH]' : '[MOTOR: LOCAL TESSERACT]';
+        let engineLabel = `[MOTOR: IA (${data.model_used || 'GEMINI FLASH'})]`;
+        if (!data.ocr_engine || !data.ocr_engine.includes('GEMINI')) {
+          if (data.gemini_fallback_reason) {
+            if (data.gemini_fallback_reason.includes('503')) {
+              engineLabel = '[MOTOR: LOCAL TESSERACT (Google Gemini con alta demanda 503 — Redundancia activa)]';
+            } else if (data.gemini_fallback_reason.includes('429')) {
+              engineLabel = '[MOTOR: LOCAL TESSERACT (Cuota Free Tier de Google agotada 429 — Redundancia activa)]';
+            } else {
+              engineLabel = '[MOTOR: LOCAL TESSERACT (Redundancia activa)]';
+            }
+          } else {
+            engineLabel = '[MOTOR: LOCAL TESSERACT]';
+          }
+        }
         if (data.rut_discrepancia) {
           ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
           ocrLiveIcon.textContent = '[ATENCIÓN]';

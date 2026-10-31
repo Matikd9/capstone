@@ -9,6 +9,7 @@ require('dotenv').config({ override: true });
 const geminiOcr = require('./geminiOcr');
 const mailer = require('./mailer');
 const mammoth = require('mammoth');
+const auth = require('./auth');
 
 // Evitar que errores asíncronos internos de workers OCR tumben el proceso Node.js
 process.on('uncaughtException', (err) => {
@@ -32,6 +33,22 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/uploads', express.static(UPLOADS_DIR));
+
+// ==========================================
+// RUTAS EXCLUSIVAS DEL PORTAL RR.HH.
+// ==========================================
+app.get('/admin/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin_portal/login.html'));
+});
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin_portal/admin.html'));
+});
+
+// Bloqueo explícito de la URL pública previa
+app.get('/admin.html', (req, res) => {
+  res.status(404).send('Not Found');
+});
 
 // Configuración DB MySQL
 const dbConfig = {
@@ -183,6 +200,9 @@ async function initDB(retries = 10, delay = 3000) {
 
       // Poblar o actualizar datos semilla de cargos y preguntas (5-8 preguntas por cargo)
       await ensureSeedData(conn);
+
+      // Inicializar y asegurar tabla de usuarios de administración (admin / papa123)
+      await auth.initAdminAuth(pool);
 
       conn.release();
       return;
@@ -1550,16 +1570,20 @@ app.get('/api/positions/:id/questions', async (req, res) => {
 // 3. FASE 1: Extracción OCR de Entrada (Credencial Técnica + CV) — Sin pedir Carnet ni Antecedentes
 app.post('/api/ocr/phase1', async (req, res) => {
   const tempFiles = [];
+  let lastGeminiError = null;
   try {
     const { credencial_file, cv_file } = req.body;
     if (!credencial_file && !cv_file) {
       return res.status(400).json({ error: 'Adjunte su Credencial Técnica o CV para analizar.' });
     }
 
-    // Prioridad 1: Extracción con Gemini 1.5 Flash (Comprensión Semántica de Alta Precisión)
-    if (geminiOcr.isGeminiAvailable()) {
+    const isAvail = geminiOcr.isGeminiAvailable();
+    console.log('[DEBUG OCR] isGeminiAvailable =', isAvail, 'API_KEY len =', (process.env.GEMINI_API_KEY || '').length);
+
+    // Prioridad 1: Extracción con Gemini Flash (Comprensión Semántica de Alta Precisión)
+    if (isAvail) {
       try {
-        console.log('[OCR/Gemini] Analizando Credencial y CV con Gemini 1.5 Flash...');
+        console.log('[OCR/Gemini] Analizando Credencial y CV con Gemini Flash...');
         const geminiData = await geminiOcr.analyzePhase1Documents({
           credencialBase64: credencial_file,
           cvBase64: cv_file
@@ -1567,6 +1591,7 @@ app.post('/api/ocr/phase1', async (req, res) => {
 
         return res.json({
           ocr_engine: 'GEMINI_FLASH',
+          model_used: geminiData.used_model || 'gemini',
           full_name: geminiData.full_name || '',
           rut_id: geminiData.rut_id || '',
           rut_source: geminiData.rut_source || (geminiData.rut_id ? 'CV' : 'NO_DETECTADO'),
@@ -1581,9 +1606,10 @@ app.post('/api/ocr/phase1', async (req, res) => {
           experience_months: geminiData.experience_months ?? null,
           credencial_status: geminiData.credencial_status || 'Documento Técnico Verificado',
           credencial_vigencia: geminiData.credencial_vigencia || 'Vigente',
-          ocr_text: `[MOTOR: GEMINI FLASH]\nPerfil: ${geminiData.resumen_perfil || 'Acreditación técnica conforme'}\nCredencial: ${geminiData.credencial_status} (${geminiData.credencial_vigencia})${geminiData.rut_source ? `\nFuente RUT: ${geminiData.rut_source}` : ''}`
+          ocr_text: `[MOTOR: IA (${geminiData.used_model || 'GEMINI'})]\nPerfil: ${geminiData.resumen_perfil || 'Acreditación técnica conforme'}\nCredencial: ${geminiData.credencial_status} (${geminiData.credencial_vigencia})${geminiData.rut_source ? `\nFuente RUT: ${geminiData.rut_source}` : ''}`
         });
       } catch (geminiErr) {
+        lastGeminiError = geminiErr.message;
         console.warn('[OCR/Gemini Fallback] Excepción en Gemini, recurriendo a motor local:', geminiErr.message);
       }
     }
@@ -1654,7 +1680,10 @@ app.post('/api/ocr/phase1', async (req, res) => {
       experience_months: cv.detected_experience_months ?? null,
       credencial_status: cred.detected_credencial_status || cv.detected_credencial_status || 'Documento Técnico Adjunto',
       credencial_vigencia: cred.carnet_vigencia || 'Vigente en documento',
-      ocr_text: combinedText
+      ocr_text: combinedText,
+      gemini_fallback_reason: lastGeminiError,
+      gemini_is_available: isAvail,
+      gemini_key_len: (process.env.GEMINI_API_KEY || '').length
     });
   } catch (err) {
     console.error('[Error /api/ocr/phase1]:', err);
@@ -2146,8 +2175,68 @@ app.get('/api/candidates/access/:token', async (req, res) => {
   }
 });
 
+// ==========================================
+// AUTENTICACIÓN Y SEGURIDAD RR.HH. (ADMIN)
+// ==========================================
+
+app.post('/api/auth/admin-login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Debe ingresar usuario y contraseña.' });
+    }
+
+    const [rows] = await pool.query('SELECT * FROM admin_users WHERE username = ?', [username.trim()]);
+    if (rows.length === 0) {
+      return res.status(401).json({ error: 'Credenciales inválidas.' });
+    }
+
+    const admin = rows[0];
+    const isMatch = auth.verifyPassword(password, admin.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Credenciales inválidas.' });
+    }
+
+    const token = auth.generateToken({
+      id: admin.id,
+      username: admin.username,
+      fullName: admin.full_name,
+      role: admin.role
+    });
+
+    console.log(`[AUTH] Inicio de sesión exitoso para operador: ${admin.username} (${admin.role})`);
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: admin.id,
+        username: admin.username,
+        fullName: admin.full_name,
+        role: admin.role
+      }
+    });
+  } catch (err) {
+    console.error('[Error /api/auth/admin-login]:', err);
+    res.status(500).json({ error: 'Error interno de autenticación.' });
+  }
+});
+
+app.get('/api/auth/verify', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  if (!token && req.query && req.query.token) {
+    token = String(req.query.token).trim();
+  }
+  const user = auth.verifyToken(token);
+  if (!user) {
+    return res.status(401).json({ valid: false });
+  }
+  res.json({ valid: true, user });
+});
+
 // 5.6 PANEL RR.HH.: APROBAR ACCESO A FAENA Y EMITIR ENLACE DE FASE 2
-app.post('/api/admin/candidates/:id/approve-faena', async (req, res) => {
+app.post('/api/admin/candidates/:id/approve-faena', auth.requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const [candRows] = await pool.query(
@@ -2205,7 +2294,7 @@ app.post('/api/admin/candidates/:id/approve-faena', async (req, res) => {
 });
 
 // 6. PANEL RR.HH. NEXXO: Obtener postulantes con filtro por Cargo y Estado de la Máquina de Estados
-app.get('/api/admin/candidates', async (req, res) => {
+app.get('/api/admin/candidates', auth.requireAdminAuth, async (req, res) => {
   try {
     const { status, position_id } = req.query;
     let query = `
@@ -2239,7 +2328,7 @@ app.get('/api/admin/candidates', async (req, res) => {
 });
 
 // 7. PANEL RR.HH. NEXXO: Cambiar estado en la Máquina de Estados
-app.patch('/api/admin/candidates/:id/status', async (req, res) => {
+app.patch('/api/admin/candidates/:id/status', auth.requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -2256,7 +2345,7 @@ app.patch('/api/admin/candidates/:id/status', async (req, res) => {
 });
 
 // 8. PANEL RR.HH. NEXXO: Estadísticas Operativas e Impacto en División El Teniente
-app.get('/api/admin/stats', async (req, res) => {
+app.get('/api/admin/stats', auth.requireAdminAuth, async (req, res) => {
   try {
     const [totalRows] = await pool.query('SELECT COUNT(*) as count FROM candidates');
     const [preAcreditadosRows] = await pool.query(
@@ -2290,7 +2379,7 @@ app.get('/api/admin/stats', async (req, res) => {
 });
 
 // 9. FASE 4: Exportar "Carpeta de Acreditación Estandarizada WebControl" (Codelco División El Teniente)
-app.get('/api/admin/candidates/:id/export-webcontrol', async (req, res) => {
+app.get('/api/admin/candidates/:id/export-webcontrol', auth.requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const [rows] = await pool.query(
@@ -2582,7 +2671,7 @@ async function reprocessCandidateOcr(id) {
   return { id, full_name: phase1Name, ocrCarnetName: phase2Name || phase1Name, city: updatedCity, experience_years: updatedExpYears, status: newStatus, crossCheckOk, discrepancies };
 }
 
-app.post('/api/admin/candidates/:id/reprocess-ocr', async (req, res) => {
+app.post('/api/admin/candidates/:id/reprocess-ocr', auth.requireAdminAuth, async (req, res) => {
   try {
     const result = await reprocessCandidateOcr(req.params.id);
     if (!result) return res.status(404).json({ error: 'Candidato o archivos no encontrados.' });

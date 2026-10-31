@@ -50,16 +50,24 @@ app.get('/admin.html', (req, res) => {
   res.status(404).send('Not Found');
 });
 
-// Configuración DB MySQL
+// Configuración DB MySQL / TiDB (Compatible con desarrollo local TCP, TiDB Cloud TLS y sockets Unix Cloud SQL)
+const isCloudSqlSocket = process.env.DB_HOST && process.env.DB_HOST.startsWith('/cloudsql/');
+const requiresSsl = process.env.DB_SSL === 'true' || (process.env.DB_HOST && process.env.DB_HOST.includes('tidbcloud.com'));
+
 const dbConfig = {
-  host: process.env.DB_HOST || 'db',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'rootpassword',
   database: process.env.DB_NAME || 'web_app',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  ...(requiresSsl ? { ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: true } } : {}),
+  ...(isCloudSqlSocket
+    ? { socketPath: process.env.DB_HOST }
+    : {
+        host: process.env.DB_HOST || 'db',
+        port: parseInt(process.env.DB_PORT || '3306', 10)
+      })
 };
 
 let pool;
@@ -80,10 +88,30 @@ const VALID_STATES = [
 ];
 
 async function initDB(retries = 10, delay = 3000) {
+  const targetDb = process.env.DB_NAME || 'web_app';
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`[DB] Conectando a MySQL (${i + 1}/${retries})...`);
-      pool = mysql.createPool(dbConfig);
+
+      // 1. Intentar conexión directa al pool con la base de datos objetivo
+      try {
+        pool = mysql.createPool(dbConfig);
+        const testConn = await pool.getConnection();
+        testConn.release();
+      } catch (connErr) {
+        // Si la base de datos no existe aún (ER_BAD_DB_ERROR / 1049), conectamos a 'test' o sin DB para crearla
+        if (connErr.code === 'ER_BAD_DB_ERROR' || connErr.errno === 1049) {
+          console.log(`[DB] La base de datos '${targetDb}' no existe. Creándola automáticamente en TiDB/MySQL...`);
+          const adminConnConfig = { ...dbConfig, database: 'test' };
+          const adminConn = await mysql.createConnection(adminConnConfig);
+          await adminConn.query(`CREATE DATABASE IF NOT EXISTS \`${targetDb}\`;`);
+          await adminConn.end();
+          pool = mysql.createPool(dbConfig);
+        } else {
+          throw connErr;
+        }
+      }
+
       const conn = await pool.getConnection();
 
       // Crear tablas base

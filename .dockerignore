@@ -1,0 +1,8 @@
+node_modules
+.git
+.devcontainer
+.env
+.env.example
+Attachments
+npm-debug.log
+.DS_Store

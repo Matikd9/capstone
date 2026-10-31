@@ -233,14 +233,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return `
           <tr>
-            <td><strong style="color: var(--safety-yellow); font-family: 'JetBrains Mono', monospace;">#${c.id}</strong></td>
-            <td><strong style="color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">${escapeHtml(c.full_name)}</strong></td>
-            <td><span style="font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);">${escapeHtml(c.rut_id)}</span></td>
-            <td><span style="font-family: 'JetBrains Mono', monospace;">${expDisplay}</span></td>
+            <td><strong style="color: var(--safety-yellow); font-family: 'IBM Plex Mono', monospace;">#${c.id}</strong></td>
+            <td><strong style="color: var(--text-primary); font-family: 'IBM Plex Mono', monospace;">${escapeHtml(c.full_name)}</strong></td>
+            <td><span style="font-family: 'IBM Plex Mono', monospace; color: var(--text-secondary);">${escapeHtml(c.rut_id)}</span></td>
+            <td><span style="font-family: 'IBM Plex Mono', monospace;">${expDisplay}</span></td>
             <td><span class="position-tag">${escapeHtml(c.position_name)}</span></td>
             <td>
               <span class="badge-code">${c.score}/${c.total_questions} (${scorePercent}%)</span>
-              <div style="font-size: 0.72rem; margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);">
+              <div style="font-size: 0.72rem; margin-top: 0.25rem; font-family: 'IBM Plex Mono', monospace; color: var(--text-secondary);">
                 Téc: <strong>${c.score_tecnico ?? 0}/3</strong> | SJT: <strong style="color: ${c.sjt_conforme ? 'var(--ecf-emerald)' : 'var(--ecf-crimson)'};">${c.sjt_conforme ? '2/2' : `${c.score_sjt ?? 0}/2`}</strong>
               </div>
             </td>
@@ -315,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
 
       ${!candidate.sjt_conforme ? `
-        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid var(--ecf-crimson-border); background: var(--ecf-crimson-dim); color: var(--ecf-crimson); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;">
+        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid var(--ecf-crimson-border); background: var(--ecf-crimson-dim); color: var(--ecf-crimson); font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem;">
           <strong>[ALERTA AUDITORÍA: RIESGO OPERACIONAL CRÍTICO]</strong><br>
           El postulante falló al menos un reactivo de Juicio Situacional (SJT). Vulneró el principio de detención de faena ('Paso Cero' / Derecho a Decir NO) o no detuvo la maniobra ante falla de estabilidad de grúa. Descartado por regla de corte normativo excluyente ECF Codelco.
         </div>
@@ -360,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p><strong>4. Cert. Antecedentes (OCR):</strong><br>${escapeHtml(candidate.ocr_antecedentes_status || 'Pendiente Fase 2')}</p>
         </div>
 
-        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald-border)' : 'var(--safety-yellow)'}; background: ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald-dim)' : 'var(--safety-yellow-dim)'}; color: ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald)' : 'var(--safety-yellow)'}; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace;">
+        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald-border)' : 'var(--safety-yellow)'}; background: ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald-dim)' : 'var(--safety-yellow-dim)'}; color: ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald)' : 'var(--safety-yellow)'}; font-size: 0.85rem; font-family: 'IBM Plex Mono', monospace;">
           <strong>DIAGNÓSTICO NORMATIVO (ECF / DS N° 132):</strong><br>
           ${escapeHtml(candidate.discrepancy_notes || 'Expediente consistente. Sin observaciones.')}
           ${candidate.ocr_manually_edited ? `<br><em>Nota de Auditoría: El postulante editó manualmente en Fase 1: ${escapeHtml(candidate.ocr_edited_fields || '')}</em>` : ''}
@@ -368,13 +368,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ${candidate.ocr_text ? `
           <details style="margin-top: 0.75rem; background: var(--surface-panel); padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid var(--border-structural);">
-            <summary style="cursor: pointer; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between;">
+            <summary style="cursor: pointer; font-weight: 700; font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between;">
               <span>[VER LOG DE TEXTO EXTRAÍDO POR OCR]</span>
               ${candidate.ocr_text.includes('[MOTOR: GEMINI') 
                 ? '<span class="badge" style="background: rgba(16,185,129,0.15); color: var(--ecf-emerald); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--ecf-emerald);">MOTOR: GEMINI FLASH</span>' 
                 : '<span class="badge" style="background: rgba(255,184,0,0.15); color: var(--safety-yellow); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--safety-yellow);">MOTOR: LOCAL TESSERACT</span>'}
             </summary>
-            <pre style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; margin-top: 0.5rem; max-height: 150px; overflow-y: auto; color: var(--text-primary);">${escapeHtml(candidate.ocr_text)}</pre>
+            <pre style="white-space: pre-wrap; font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; margin-top: 0.5rem; max-height: 150px; overflow-y: auto; color: var(--text-primary);">${escapeHtml(candidate.ocr_text)}</pre>
           </details>
         ` : ''}
       </div>
@@ -396,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <!-- Acción Operativa de Aprobación de Acceso a Faena (Fase 2) -->
       ${candidate.status === 'PRESELECCIONADO' ? `
         <div style="background: rgba(255, 184, 0, 0.08); border: 1px solid var(--safety-yellow); padding: 1.15rem; border-radius: var(--radius-terminal); margin-top: 1rem; text-align: left;">
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 700; color: var(--safety-yellow); margin-bottom: 0.35rem;">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; font-weight: 700; color: var(--safety-yellow); margin-bottom: 0.35rem;">
             [ACCIÓN DE RR.HH.: AUTORIZAR ACCESO A FAENA]
           </div>
           <p style="font-size: 0.82rem; color: var(--text-primary); margin: 0 0 0.85rem 0;">

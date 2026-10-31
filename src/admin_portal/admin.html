@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panel RR.HH. & Exportación WebControl - Nexxo S.A.</title>
+  <title>Panel RR.HH. & Auditoría WebControl - Nexxo S.A.</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="shortcut icon" href="/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin.css">
   <script>
     if (!sessionStorage.getItem('nexxo_admin_token')) {
       window.location.replace('/admin/login');
@@ -16,54 +19,92 @@
 </head>
 <body>
   <div class="app-layout">
-    <!-- Header principal -->
+    <!-- Header institucional idéntico al portal público -->
     <header class="top-nav">
-      <div class="brand">
-        <span class="company-logo">NEXXO S.A.</span>
-        <span class="group-tag">Terminal RR.HH. & Pre-Acreditación División El Teniente (WebControl)</span>
+      <div class="top-nav-inner">
+        <div class="brand">
+          <a href="/admin" class="brand-link" aria-label="Panel RR.HH. Nexxo S.A.">
+            <img src="/logo-nexxo.png" alt="Nexxo S.A. - Grupo Echeverría Izquierdo" class="brand-logo-img">
+          </a>
+          <span class="brand-divider"></span>
+          <span class="division-tag">Terminal RR.HH. & Pre-Acreditación División El Teniente (WebControl)</span>
+        </div>
+        <div class="nav-links">
+          <span class="nav-user-badge" id="admin-user-badge">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            [ADMINISTRADOR: RR.HH.]
+          </span>
+          <button id="btn-logout" class="btn btn-logout-admin">Cerrar Sesión</button>
+        </div>
       </div>
-      <div class="nav-links" style="display: flex; align-items: center; gap: 1rem;">
-        <span class="nav-link active" id="admin-user-badge">[ADMIN: RR.HH.]</span>
-        <button id="btn-logout" class="btn btn-secondary" style="padding: 0.35rem 0.8rem; font-size: 0.8rem; border-color: #ff5252; color: #ff5252; cursor: pointer;">Cerrar Sesión</button>
-      </div>
+      <!-- Franja de seguridad bajo el header -->
+      <div class="hazard-stripe"></div>
     </header>
 
-    <main class="main-container full-width">
-      <!-- Header del Panel -->
-      <section class="portal-header">
-        <span class="mining-tag">FASE 04: AUDITORÍA NORMATIVA & MATRIZ WEBCONTROL (CODELCO)</span>
-        <h1>MATRIZ DE AUDITORÍA TÉCNICA & VALIDACIÓN CRUZADA OCR</h1>
-        <p class="subtitle">Supervisión técnica por excepción: RR.HH. audita discrepancias en expedientes <code>EN_REVISION_MANUAL</code> y exporta carpetas técnicas conformes para ingreso a faena minera bajo estándar ECF Codelco y DS N° 132.</p>
-      </section>
+    <!-- Hero blanco institucional -->
+    <section class="portal-hero">
+      <div class="hero-inner">
+        <div class="hero-chips">
+          <span class="chip chip-accent">
+            <span class="chip-dot"></span>
+            FASE 04: AUDITORÍA NORMATIVA &amp; MATRIZ WEBCONTROL (CODELCO)
+          </span>
+          <span class="chip chip-muted">División El Teniente</span>
+        </div>
+        <h1 class="hero-title">Matriz de Auditoría Técnica &amp; Validación Cruzada OCR</h1>
+        <p class="hero-subtitle">
+          Supervisión técnica por excepción: RR.HH. audita discrepancias en expedientes <code>EN_REVISION_MANUAL</code> y exporta carpetas técnicas conformes para ingreso a faena minera bajo estándar ECF Codelco y DS N° 132.
+        </p>
+      </div>
+    </section>
 
-      <!-- Métricas de Impacto Operativo y Económico (Instrumentación Industrial) -->
+    <main class="main-container full-width">
+      <!-- Métricas de Impacto Operativo y Económico -->
       <section class="metrics-grid">
         <div class="metric-card">
-          <span class="metric-label">TOTAL POSTULACIONES</span>
+          <div class="metric-header">
+            <span class="metric-label">TOTAL POSTULACIONES</span>
+            <span class="metric-badge">OCR</span>
+          </div>
           <span class="metric-value" id="metric-total">0</span>
           <span class="metric-desc">Expedientes procesados por OCR</span>
         </div>
 
         <div class="metric-card metric-success">
-          <span class="metric-label">PRE-ACREDITADOS / NÓMINA</span>
+          <div class="metric-header">
+            <span class="metric-label">PRE-ACREDITADOS / NÓMINA</span>
+            <span class="metric-badge metric-badge-success">CONFORME</span>
+          </div>
           <span class="metric-value" id="metric-approved">0</span>
-          <span class="metric-desc">Conformes para exportación WebControl</span>
-        </div>
-
-        <div class="metric-card">
-          <span class="metric-label">EN REVISIÓN MANUAL</span>
-          <span class="metric-value" id="metric-review" style="color: var(--safety-yellow);">0</span>
-          <span class="metric-desc">Auditoría requerida (Discordancia / Edición)</span>
+          <span class="metric-desc">Listos para exportación WebControl</span>
         </div>
 
         <div class="metric-card metric-warning">
-          <span class="metric-label">DESCARTADOS TÉCNICOS</span>
+          <div class="metric-header">
+            <span class="metric-label">EN REVISIÓN MANUAL</span>
+            <span class="metric-badge metric-badge-warning">AUDITORÍA</span>
+          </div>
+          <span class="metric-value" id="metric-review">0</span>
+          <span class="metric-desc">Discrepancias detectadas por OCR</span>
+        </div>
+
+        <div class="metric-card metric-danger">
+          <div class="metric-header">
+            <span class="metric-label">DESCARTADOS TÉCNICOS</span>
+            <span class="metric-badge metric-badge-danger">FILTRO ECF</span>
+          </div>
           <span class="metric-value" id="metric-rejected">0</span>
           <span class="metric-desc">No conformes con ECF / Test &lt; 80%</span>
         </div>
 
-        <div class="metric-card metric-highlight">
-          <span class="metric-label">GASTO HUNDIDO EVITADO</span>
+        <div class="metric-card metric-savings">
+          <div class="metric-header">
+            <span class="metric-label">GASTO HUNDIDO EVITADO</span>
+            <span class="metric-badge metric-badge-accent">EFICIENCIA</span>
+          </div>
           <span class="metric-value" id="metric-savings">$0 CLP</span>
           <span class="metric-desc">Ahorro en acreditaciones fallidas</span>
         </div>
@@ -71,9 +112,11 @@
 
       <!-- Filtros y Matriz de Auditoría -->
       <section class="card admin-card">
-        <span class="terminal-phase-badge">[MATRIZ SCADA DE POSTULACIONES // ESTADOS EN TIEMPO REAL]</span>
         <div class="table-header-tools">
-          <h2>TUBERÍA DE POSTULANTES (STATE MACHINE)</h2>
+          <div>
+            <div class="table-card-tag">[MATRIZ SCADA DE POSTULACIONES // ESTADOS EN TIEMPO REAL]</div>
+            <h2 class="table-card-title">Tubería de Postulantes (State Machine)</h2>
+          </div>
           
           <div class="filters-bar">
             <div class="filter-group">
@@ -95,7 +138,14 @@
               </select>
             </div>
 
-            <button class="btn btn-secondary" id="btn-refresh">Actualizar Matriz</button>
+            <button class="btn btn-secondary" id="btn-refresh">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
+                <path d="M23 4v6h-6"></path>
+                <path d="M1 20v-6h6"></path>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              Actualizar Matriz
+            </button>
           </div>
         </div>
 
@@ -133,9 +183,9 @@
     <!-- Modal Detalle y Auditoría Cruzada -->
     <div class="modal-backdrop" id="modal-candidate" style="display:none;">
       <div class="modal-box">
-        <button type="button" class="modal-close" id="btn-close-modal">&times;</button>
-        <span class="terminal-phase-badge">[EXPEDIENTE TÉCNICO INDIVIDUAL]</span>
-        <h2 id="modal-title">Expediente del Postulante</h2>
+        <button type="button" class="modal-close" id="btn-close-modal" aria-label="Cerrar modal">&times;</button>
+        <div class="modal-top-chip">[EXPEDIENTE TÉCNICO INDIVIDUAL]</div>
+        <h2 id="modal-title" class="modal-header-title">Expediente del Postulante</h2>
 
         <div class="modal-content-grid" id="modal-body">
           <!-- Detalle inyectado por JS -->

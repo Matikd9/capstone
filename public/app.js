@@ -330,8 +330,8 @@ document.addEventListener('DOMContentLoaded', () => {
     state.pendingOcrRerun = false;
     ocrLiveBanner.style.display = 'flex';
     ocrLiveBanner.className = 'ocr-banner ocr-banner-loading';
-    ocrLiveIcon.textContent = '[PROCESANDO]';
-    ocrLiveText.textContent = 'Extrayendo datos de su Credencial Técnica y/o CV mediante OCR local...';
+    ocrLiveIcon.textContent = '●';
+    ocrLiveText.textContent = 'Leyendo y procesando antecedentes en sus documentos...';
     ocrFieldsContainer.style.display = 'block';
 
     try {
@@ -351,9 +351,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.full_name && !fullNameInput.dataset.edited) {
           fullNameInput.value = formatTitleCase(data.full_name);
           if (data.rut_source === 'CREDENCIAL') {
-            hintName.textContent = 'Nombre legal oficial rescatado desde Licencia / Credencial Técnica';
+            hintName.textContent = 'Nombre oficial obtenido desde Licencia / Credencial Técnica';
           } else {
-            hintName.textContent = 'Nombre extraído automáticamente por OCR';
+            hintName.textContent = 'Nombre detectado automáticamente en su CV';
           }
           hintName.style.color = 'var(--status-normal-text)';
         }
@@ -361,16 +361,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.rut_id && !rutInput.dataset.edited) {
           rutInput.value = data.rut_id;
           if (data.rut_discrepancia) {
-            hintRut.textContent = `[DISCREPANCIA: RUT en CV (${data.rut_cv || 'S/I'}) difiere de Licencia/Credencial (${data.rut_credencial || 'S/I'})]`;
+            hintRut.textContent = `Atención: El RUT en su CV difiere de su Credencial. Se priorizó la Credencial oficial.`;
             hintRut.style.color = 'var(--safety-yellow)';
           } else if (data.rut_source === 'CREDENCIAL') {
-            hintRut.textContent = 'RUT rescatado automáticamente de Licencia / Credencial Técnica Habilitante';
+            hintRut.textContent = 'RUT validado desde Licencia / Credencial Técnica';
             hintRut.style.color = 'var(--status-normal-text)';
           } else if (data.rut_source === 'AMBOS_COINCIDENTES') {
-            hintRut.textContent = 'RUT validado y coincidente en CV y Licencia/Credencial Técnica';
+            hintRut.textContent = 'RUT validado y coincidente en CV y Credencial Técnica';
             hintRut.style.color = 'var(--status-normal-text)';
           } else {
-            hintRut.textContent = 'RUT extraído desde Currículum Vitae (Se contrastará en Fase 2)';
+            hintRut.textContent = 'RUT obtenido desde Currículum Vitae';
             hintRut.style.color = 'var(--status-normal-text)';
           }
         }
@@ -389,13 +389,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (data.city) {
             cityInput.value = data.city;
             if (hintCity) {
-              hintCity.textContent = 'Ciudad de residencia detectada en encabezado/contacto del CV';
+              hintCity.textContent = 'Ciudad de residencia detectada en CV';
               hintCity.style.color = 'var(--status-normal-text)';
             }
           } else {
             cityInput.value = '';
             if (hintCity) {
-              hintCity.textContent = 'CV sin ciudad de residencia explícita (ingrésela manualmente)';
+              hintCity.textContent = 'Por favor indique su comuna de residencia';
               hintCity.style.color = 'var(--text-muted)';
             }
           }
@@ -403,64 +403,37 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.experience_years !== null && data.experience_years !== undefined && !expInput.dataset.edited) {
           expInput.value = data.experience_years;
           if (data.experience_months !== null && data.experience_months !== undefined) {
-            hintExp.textContent = `Experiencia calculada en sección laboral: ${data.experience_years} años (${data.experience_months} meses efectivos, sin prácticas)`;
+            hintExp.textContent = `Experiencia estimada: ${data.experience_years} años (${data.experience_months} meses comprobables)`;
           } else {
-            hintExp.textContent = `Experiencia calculada por OCR desde CV: ${data.experience_years} años`;
+            hintExp.textContent = `Experiencia laboral estimada: ${data.experience_years} años`;
           }
           hintExp.style.color = 'var(--status-normal-text)';
         }
 
-        // Actualizar Telemetría en Tiempo Real
-        if (telemetryRut) {
-          if (data.rut_id) {
-            const srcLabel = data.rut_source === 'CREDENCIAL' ? 'LICENCIA' : (data.rut_source === 'AMBOS_COINCIDENTES' ? 'VERIFICADO 2x' : (data.rut_source === 'DISCREPANCIA' ? 'DISCREPANCIA' : 'CV'));
-            telemetryRut.textContent = `${data.rut_id} [${srcLabel}]`;
-          } else {
-            telemetryRut.textContent = 'NO DETECTADO (INGRESO MANUAL)';
-          }
-        }
-        if (telemetryCity) telemetryCity.textContent = data.city || 'NO ESPECIFICADA EN CV';
-        if (telemetryExp) {
-          const m = data.experience_months !== null && data.experience_months !== undefined ? data.experience_months : 0;
-          telemetryExp.textContent = `${data.experience_years || 0} AÑOS (${m} MESES EFECTIVOS)`;
-        }
-        if (telemetryCred) {
-          telemetryCred.textContent = `${data.credencial_status || 'VERIFICADA'} (${data.credencial_vigencia || 'VIGENTE'})`;
-        }
+        // Actualizar campos de compatibilidad si existen en el DOM
+        if (telemetryRut) telemetryRut.textContent = data.rut_id || '';
+        if (telemetryCity) telemetryCity.textContent = data.city || '';
+        if (telemetryExp) telemetryExp.textContent = `${data.experience_years || 0} años`;
+        if (telemetryCred) telemetryCred.textContent = data.credencial_status || 'VERIFICADA';
 
-        let engineLabel = `[MOTOR: IA (${data.model_used || 'GEMINI FLASH'})]`;
-        if (!data.ocr_engine || !data.ocr_engine.includes('GEMINI')) {
-          if (data.gemini_fallback_reason) {
-            if (data.gemini_fallback_reason.includes('503')) {
-              engineLabel = '[MOTOR: LOCAL TESSERACT (Google Gemini con alta demanda 503 — Redundancia activa)]';
-            } else if (data.gemini_fallback_reason.includes('429')) {
-              engineLabel = '[MOTOR: LOCAL TESSERACT (Cuota Free Tier de Google agotada 429 — Redundancia activa)]';
-            } else {
-              engineLabel = '[MOTOR: LOCAL TESSERACT (Redundancia activa)]';
-            }
-          } else {
-            engineLabel = '[MOTOR: LOCAL TESSERACT]';
-          }
-        }
         if (data.rut_discrepancia) {
           ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
-          ocrLiveIcon.textContent = '[ATENCIÓN]';
-          ocrLiveText.textContent = `${engineLabel} Alerta: El RUT del CV (${data.rut_cv}) difiere de la Licencia/Credencial (${data.rut_credencial}). Se priorizó la Licencia Oficial. Verifique sus datos abajo.`;
+          ocrLiveIcon.textContent = '⚠️';
+          ocrLiveText.textContent = `Aviso: El RUT en su CV (${data.rut_cv}) difiere de su Credencial (${data.rut_credencial}). Se priorizó la Credencial Oficial. Por favor verifique sus datos.`;
         } else {
           ocrLiveBanner.className = 'ocr-banner ocr-banner-done';
-          ocrLiveIcon.textContent = '[OCR OK]';
-          const srcMsg = data.rut_source === 'CREDENCIAL' ? ' (RUT rescatado desde Licencia/Credencial)' : '';
-          ocrLiveText.textContent = `${engineLabel} OCR Fase 1 completado (${data.credencial_status || 'Documento procesado'} — ${data.credencial_vigencia || 'Vigente'})${srcMsg}. Verifique sus datos abajo o edite cualquier campo si es necesario.`;
+          ocrLiveIcon.textContent = '✓';
+          ocrLiveText.textContent = `Documentos procesados exitosamente. Hemos autocompletado sus datos; por favor verifique o edite cualquier campo antes de continuar.`;
         }
       } else {
         ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
-        ocrLiveIcon.textContent = '[AVISO]';
-        ocrLiveText.textContent = 'Complete o verifique manualmente sus datos en el formulario inferior.';
+        ocrLiveIcon.textContent = 'ℹ️';
+        ocrLiveText.textContent = 'Por favor verifique y complete sus datos personales en el formulario inferior.';
       }
     } catch (e) {
       ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
-      ocrLiveIcon.textContent = '[AVISO]';
-      ocrLiveText.textContent = 'No se pudo conectar al motor OCR. Puede completar o corregir sus datos manualmente abajo.';
+      ocrLiveIcon.textContent = 'ℹ️';
+      ocrLiveText.textContent = 'Puede completar o revisar sus datos personales directamente en el formulario.';
     } finally {
       state.isRunningOcr = false;
       if (state.pendingOcrRerun) {
@@ -567,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selfiePreview.src = state.initialSelfieBase64;
     selfiePreview.style.display = 'block';
     webcamView.style.display = 'none';
-    btnTakeSelfie.textContent = 'Selfie de Validación Capturada';
+    btnTakeSelfie.textContent = 'Fotografía Registrada';
     btnTakeSelfie.classList.replace('btn-camera', 'btn-success');
   });
 
@@ -595,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
 
     if (state.isRunningOcr) {
-      alert('Espere unos segundos a que finalice la lectura OCR de sus documentos.');
+      alert('Por favor espere un momento a que finalice la verificación de sus documentos.');
       return;
     }
 
@@ -605,12 +578,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!state.initialSelfieBase64) {
-      alert('Por favor active su cámara y tome la Selfie de Validación Informada antes de iniciar el Mini-Test.');
+      alert('Por favor active su cámara y capture su fotografía antes de iniciar la evaluación técnica.');
       return;
     }
 
     if (!consentProctoring.checked) {
-      alert('Debe aceptar el Consentimiento de Proctoring Transparente para rendir el Mini-Test Técnico.');
+      alert('Debe aceptar el consentimiento informado para rendir la evaluación técnica.');
       return;
     }
 
@@ -784,7 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
 
-          <div style="margin-top: 1.25rem; text-align: left; background: var(--surface-panel); border: 1px solid var(--safety-yellow); border-left: 4px solid var(--safety-yellow); color: var(--text-primary); padding: 1.25rem; border-radius: var(--radius-terminal); font-size: 0.88rem; font-family: 'JetBrains Mono', monospace;">
+          <div style="margin-top: 1.25rem; text-align: left; background: var(--surface-panel); border: 1px solid var(--safety-yellow); border-left: 4px solid var(--safety-yellow); color: var(--text-primary); padding: 1.25rem; border-radius: var(--radius-terminal); font-size: 0.88rem; font-family: 'IBM Plex Mono', monospace;">
             <strong style="color: var(--safety-yellow);">ETAPA ACTUAL: ASIGNACIÓN DE DOTACIÓN POR RR.HH.</strong><br><br>
             Ha calificado técnicamente para la parada de planta en <strong>División El Teniente</strong>.<br><br>
             <strong>Próximos Pasos Normativos:</strong><br>
@@ -822,11 +795,11 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="status-pill status-Rechazado">[${data.status}]</span>
             </div>
           </div>
-          <div style="margin-top: 1.25rem; text-align: left; background: var(--surface-panel); border: 1px solid var(--ecf-crimson-border); border-left: 4px solid var(--ecf-crimson); color: var(--text-primary); padding: 1rem; border-radius: var(--radius-terminal); font-size: 0.88rem; font-family: 'JetBrains Mono', monospace;">
+          <div style="margin-top: 1.25rem; text-align: left; background: var(--surface-panel); border: 1px solid var(--ecf-crimson-border); border-left: 4px solid var(--ecf-crimson); color: var(--text-primary); padding: 1rem; border-radius: var(--radius-terminal); font-size: 0.88rem; font-family: 'IBM Plex Mono', monospace;">
             <strong style="color: var(--ecf-crimson);">DIAGNÓSTICO DEL DESCARTE AUTOMÁTICO:</strong><br>
             ${(data.rejectionReasons || []).map(r => `• ${r}`).join('<br>')}
           </div>
-          <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.82rem; font-family: 'JetBrains Mono', monospace;">
+          <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.82rem; font-family: 'IBM Plex Mono', monospace;">
             En estricto cumplimiento de la normativa laboral (Dirección del Trabajo y Ley N° 19.628), no se le ha solicitado Cédula de Identidad ni Certificado de Antecedentes Penales.
           </p>
         `;
@@ -900,7 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     btnSubmitPhase2.disabled = true;
-    btnSubmitPhase2.textContent = 'Ejecutando Motor OCR de Validación Cruzada (Fase 3)...';
+    btnSubmitPhase2.textContent = 'Guardando antecedentes y finalizando...';
 
     try {
       const res = await fetch(`/api/candidates/${state.candidateId}/phase2-acreditacion`, {
@@ -918,56 +891,56 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) {
         alert(`Error en Pre-Acreditación: ${data.error}`);
         btnSubmitPhase2.disabled = false;
-        btnSubmitPhase2.textContent = 'Ejecutar Validación Cruzada OCR y Finalizar Pre-Acreditación';
+        btnSubmitPhase2.textContent = 'Enviar Documentación y Finalizar Postulación';
         return;
       }
 
       const isPreAcreditado = data.status === 'PRE_ACREDITADO';
-      finalIcon.textContent = isPreAcreditado ? 'ESTADO: PRE-ACREDITADO' : 'ESTADO: EN REVISIÓN MANUAL';
+      finalIcon.textContent = isPreAcreditado ? 'ESTADO: PRE-ACREDITADO' : 'ESTADO: EN REVISIÓN';
       finalIcon.className = `status-pill ${isPreAcreditado ? 'status-Aprobado' : 'status-Pendiente'}`;
       finalTitle.textContent = isPreAcreditado
-        ? 'Expediente 100% Pre-Acreditado para División El Teniente'
-        : 'Documentación Recibida — En Revisión Manual por RR.HH.';
+        ? 'Documentación Pre-Acreditada para División El Teniente'
+        : 'Documentación Recibida — En Revisión por RR.HH.';
       finalSubtitle.textContent = isPreAcreditado
-        ? 'El motor OCR validó exitosamente la consistencia entre su Cédula, Certificación Técnica y Antecedentes. Su Carpeta WebControl está lista.'
-        : 'Sus documentos fueron cargados correctamente. Un especialista de Nexxo S.A. verificará visualmente un detalle de lectura OCR.';
+        ? 'Su documentación ha sido verificada exitosamente. Su carpeta de acreditación está lista para revisión de faena.'
+        : 'Sus documentos fueron recibidos correctamente. El equipo de Selección revisará los antecedentes para coordinar su ingreso.';
 
       resultSummary.innerHTML = `
         <div class="info-grid">
           <div class="info-item">
-            <span class="label">Folio Expediente</span>
+            <span class="label">Folio de Postulación</span>
             <span class="value">#${data.candidateId}</span>
           </div>
           <div class="info-item">
-            <span class="label">Vigencia Cédula (OCR)</span>
-            <span class="value">${data.ocrCarnetVigencia || 'En verificación'}</span>
+            <span class="label">Vigencia Cédula</span>
+            <span class="value">${data.ocrCarnetVigencia || 'Vigente'}</span>
           </div>
           <div class="info-item">
-            <span class="label">Antecedentes (OCR)</span>
+            <span class="label">Certificado de Antecedentes</span>
             <span class="value">${data.ocrAntecedentesStatus || 'Recibido'}</span>
           </div>
           <div class="info-item">
-            <span class="label">Estado Máquina de Estados</span>
-            <span class="status-pill ${isPreAcreditado ? 'status-Aprobado' : 'status-Pendiente'}">${data.status}</span>
+            <span class="label">Estado de la Solicitud</span>
+            <span class="status-pill ${isPreAcreditado ? 'status-Aprobado' : 'status-Pendiente'}">${isPreAcreditado ? 'PRE-ACREDITADO' : 'EN REVISIÓN'}</span>
           </div>
         </div>
         ${data.discrepancies && data.discrepancies.length > 0 ? `
           <div style="margin-top: 1.25rem; text-align: left; background: var(--status-warning-bg); border: 1px solid var(--status-warning-border); color: var(--status-warning-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.88rem;">
-            <strong>Detalle enviado a mesa de revisión de RR.HH. Nexxo:</strong><br>
+            <strong>Observación para mesa de selección Nexxo:</strong><br>
             ${data.discrepancies.join('<br>')}
           </div>
         ` : `
           <div style="margin-top: 1.25rem; text-align: left; background: var(--status-normal-bg); border: 1px solid var(--status-normal-border); color: var(--status-normal-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.88rem;">
-            <strong>Cruce de Identidad 100% Consistente:</strong> El RUT y Nombre de su Cédula coinciden con su postulación y certificación técnica de la Fase 1.
+            <strong>Validación de Identidad Conforme:</strong> El RUT y Nombre de su Cédula coinciden con sus antecedentes y especialidad técnica.
           </div>
         `}
       `;
 
       goToStep(4);
     } catch (err) {
-      alert('Error de conexión al procesar la Fase 2.');
+      alert('Error de conexión al procesar la documentación.');
       btnSubmitPhase2.disabled = false;
-      btnSubmitPhase2.textContent = 'Ejecutar Validación Cruzada OCR y Finalizar Pre-Acreditación';
+      btnSubmitPhase2.textContent = 'Enviar Documentación y Finalizar Postulación';
     }
   });
 
@@ -1003,7 +976,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bannerContainer.className = 'ocr-banner ocr-banner-done';
       bannerContainer.style.marginBottom = '1.25rem';
       bannerContainer.innerHTML = `
-        <strong style="font-family: 'JetBrains Mono', monospace;">[ACCESO A FAENA APROBADO]</strong>
+        <strong style="font-family: 'IBM Plex Mono', monospace;">[ACCESO A FAENA APROBADO]</strong>
         <span>Bienvenido/a <strong>${data.full_name}</strong>. Su cupo ha sido autorizado por RR.HH. Ingrese su Cédula y Certificado de Antecedentes para conformar su Carpeta WebControl Codelco.</span>
       `;
 

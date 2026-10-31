@@ -1,4 +1,47 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Verificación estricta de sesión de Administrador
+  const adminToken = sessionStorage.getItem('nexxo_admin_token');
+  if (!adminToken) {
+    window.location.replace('/admin/login');
+    return;
+  }
+
+  // Visualizar operador autenticado
+  try {
+    const adminUser = JSON.parse(sessionStorage.getItem('nexxo_admin_user') || '{}');
+    const badge = document.getElementById('admin-user-badge');
+    if (badge && adminUser.username) {
+      badge.textContent = `[OPERADOR: ${adminUser.username.toUpperCase()}]`;
+    }
+  } catch (e) {}
+
+  // Enlazar botón Cerrar Sesión
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+      sessionStorage.removeItem('nexxo_admin_token');
+      sessionStorage.removeItem('nexxo_admin_user');
+      window.location.replace('/admin/login');
+    });
+  }
+
+  // Wrapper para peticiones autenticadas
+  async function authFetch(url, options = {}) {
+    options.headers = options.headers || {};
+    options.headers['Authorization'] = `Bearer ${adminToken}`;
+    const res = await fetch(url, options);
+    if (res.status === 401 || res.status === 403) {
+      if (typeof showToast === 'function') {
+        showToast('[SESIÓN EXPIRADA] Redirigiendo a pantalla de acceso...', 'warn');
+      }
+      sessionStorage.removeItem('nexxo_admin_token');
+      sessionStorage.removeItem('nexxo_admin_user');
+      setTimeout(() => window.location.replace('/admin/login'), 1200);
+      throw new Error('Sesión no autorizada o expirada.');
+    }
+    return res;
+  }
+
   const metricTotal = document.getElementById('metric-total');
   const metricApproved = document.getElementById('metric-approved');
   const metricReview = document.getElementById('metric-review');
@@ -136,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. Cargar Métricas Operativas e Impacto Económico
   async function loadStats() {
     try {
-      const res = await fetch('/api/admin/stats');
+      const res = await authFetch('/api/admin/stats');
       const stats = await res.json();
 
       metricTotal.textContent = stats.total || 0;
@@ -165,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (posVal) params.append('position_id', posVal);
       if (statusVal) params.append('status', statusVal);
 
-      const res = await fetch(`/api/admin/candidates?${params.toString()}`);
+      const res = await authFetch(`/api/admin/candidates?${params.toString()}`);
       const candidates = await res.json();
 
       if (!Array.isArray(candidates) || candidates.length === 0) {
@@ -213,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 Auditar
               </button>
               ${canExport ? `
-                <a href="/api/admin/candidates/${c.id}/export-webcontrol" target="_blank" class="btn btn-primary btn-sm" title="Generar Carpeta Estandarizada WebControl">
+                <a href="/api/admin/candidates/${c.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-primary btn-sm" title="Generar Carpeta Estandarizada WebControl">
                   WebControl
                 </a>
               ` : ''}
@@ -344,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${candidate.cv_file ? `<a href="${candidate.cv_file}" target="_blank" class="btn btn-secondary">Ver CV</a>` : ''}
           ${carnetUrl ? `<a href="${carnetUrl}" target="_blank" class="btn btn-secondary">Ver Cédula</a>` : ''}
           ${candidate.antecedentes_file ? `<a href="${candidate.antecedentes_file}" target="_blank" class="btn btn-secondary">Ver Antecedentes</a>` : ''}
-          <a href="/api/admin/candidates/${candidate.id}/export-webcontrol" target="_blank" class="btn btn-primary">
+          <a href="/api/admin/candidates/${candidate.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-primary">
             Generar Carpeta WebControl (PDF / Estandarizado)
           </a>
         </div>
@@ -417,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.textContent = 'Aprobando y despachando correo...';
     }
     try {
-      const res = await fetch(`/api/admin/candidates/${id}/approve-faena`, { method: 'POST' });
+      const res = await authFetch(`/api/admin/candidates/${id}/approve-faena`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         if (data.mail_sent) {
@@ -453,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.textContent = 'Analizando...';
     }
     try {
-      const res = await fetch(`/api/admin/candidates/${id}/reprocess-ocr`, { method: 'POST' });
+      const res = await authFetch(`/api/admin/candidates/${id}/reprocess-ocr`, { method: 'POST' });
       if (res.ok) {
         showToast('Expediente re-analizado correctamente por OCR.', 'success');
         await loadCandidates();
@@ -469,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.updateCandidateStatus = async (id, status) => {
     try {
-      const res = await fetch(`/api/admin/candidates/${id}/status`, {
+      const res = await authFetch(`/api/admin/candidates/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })

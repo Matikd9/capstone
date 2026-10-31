@@ -29,7 +29,8 @@ function parseBase64Payload(base64Data, defaultMime = 'image/jpeg') {
 }
 
 /**
- * Llama a la API de Gemini 1.5 Flash mediante REST
+ * Llama a la API de Gemini mediante REST con Conmutación en Cascada Multi-Modelo
+ * Si un modelo está saturado (503) o con cuota agotada (429), conmuta automáticamente al siguiente modelo de IA.
  */
 async function callGeminiGenerateContent(parts, systemInstruction = null) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -37,45 +38,73 @@ async function callGeminiGenerateContent(parts, systemInstruction = null) {
     throw new Error('GEMINI_API_KEY no configurada en el entorno.');
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  // Lista de modelos ordenados por prioridad de cascada
+  const modelsToTry = [
+    process.env.GEMINI_MODEL || 'gemini-3.5-flash',
+    'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite'
+  ].filter((v, i, a) => a.indexOf(v) === i);
 
-  const requestBody = {
-    contents: [
-      {
-        role: 'user',
-        parts: parts
+  const errors = [];
+
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const currentModel = modelsToTry[i];
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
+
+    const requestBody = {
+      contents: [
+        {
+          role: 'user',
+          parts: parts
+        }
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1
       }
-    ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.1
-    }
-  };
-
-  if (systemInstruction) {
-    requestBody.systemInstruction = {
-      parts: [{ text: systemInstruction }]
     };
+
+    if (systemInstruction) {
+      requestBody.systemInstruction = {
+        parts: [{ text: systemInstruction }]
+      };
+    }
+
+    try {
+      console.log(`[Gemini Cascada] (${i + 1}/${modelsToTry.length}) Invocando modelo IA: ${currentModel}...`);
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const msg = `Modelo ${currentModel} respondió HTTP ${response.status}: ${errorText.slice(0, 140)}`;
+        errors.push(msg);
+        console.warn(`[Gemini Cascada Aviso] ${msg}. Conmutando al siguiente modelo de respaldo...`);
+        await new Promise(r => setTimeout(r, 200));
+        continue;
+      }
+
+      const jsonResult = await response.json();
+      const rawText = jsonResult?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) {
+        throw new Error(`La respuesta de ${currentModel} no contiene datos de texto.`);
+      }
+
+      const parsed = JSON.parse(rawText);
+      parsed._used_model = currentModel;
+      console.log(`[Gemini Cascada Éxito] Respuesta generada exitosamente con: ${currentModel}`);
+      return parsed;
+    } catch (err) {
+      errors.push(`Modelo ${currentModel} falló: ${err.message}`);
+      console.warn(`[Gemini Cascada Error] Modelo ${currentModel}: ${err.message}`);
+      await new Promise(r => setTimeout(r, 200));
+    }
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Error en API Gemini (${response.status}): ${errorText}`);
-  }
-
-  const jsonResult = await response.json();
-  const rawText = jsonResult?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) {
-    throw new Error('La respuesta de Gemini no contiene datos de texto.');
-  }
-
-  return JSON.parse(rawText);
+  throw new Error(`Todos los modelos de IA en cascada fallaron:\n${errors.join('\n')}`);
 }
 
 /**
@@ -209,7 +238,8 @@ Devuelve un JSON estrictamente estructurado con las siguientes claves:
     credencial_status: rawResult.credencial_status || 'Documento Técnico Verificado',
     credencial_vigencia: rawResult.credencial_vigencia || 'Vigente',
     es_conforme_tecnico: Boolean(rawResult.es_conforme_tecnico),
-    resumen_perfil: rawResult.resumen_perfil || ''
+    resumen_perfil: rawResult.resumen_perfil || '',
+    used_model: rawResult._used_model || 'gemini'
   };
 }
 

@@ -7,7 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/style.css">
+  <script>
+    if (!sessionStorage.getItem('nexxo_admin_token')) {
+      window.location.replace('/admin/login');
+    }
+  </script>
 </head>
 <body>
   <div class="app-layout">
@@ -17,9 +22,9 @@
         <span class="company-logo">NEXXO S.A.</span>
         <span class="group-tag">Terminal RR.HH. & Pre-Acreditación División El Teniente (WebControl)</span>
       </div>
-      <div class="nav-links">
-        <a href="index.html" class="nav-link">Portal Convocatoria</a>
-        <a href="admin.html" class="nav-link active">Panel RR.HH. / WebControl</a>
+      <div class="nav-links" style="display: flex; align-items: center; gap: 1rem;">
+        <span class="nav-link active" id="admin-user-badge">[ADMIN: RR.HH.]</span>
+        <button id="btn-logout" class="btn btn-secondary" style="padding: 0.35rem 0.8rem; font-size: 0.8rem; border-color: #ff5252; color: #ff5252; cursor: pointer;">Cerrar Sesión</button>
       </div>
     </header>
 
@@ -142,6 +147,6 @@
   <!-- Contenedor Flotante de Notificaciones Toast Industriales -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="admin.js"></script>
+  <script src="/admin.js"></script>
 </body>
 </html>

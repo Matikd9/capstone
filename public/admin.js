@@ -58,6 +58,88 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalBody = document.getElementById('modal-body');
   const btnCloseModal = document.getElementById('btn-close-modal');
 
+  // Centro de Notificaciones Fase 2
+  const btnNotifications = document.getElementById('btn-notifications');
+  const notificationBadge = document.getElementById('notification-badge');
+  const notificationDropdown = document.getElementById('notification-dropdown');
+  const notificationList = document.getElementById('notification-list');
+  const notificationHeaderCount = document.getElementById('notification-header-count');
+
+  async function loadNotifications() {
+    if (!btnNotifications) return;
+    try {
+      const res = await authFetch('/api/admin/notifications');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const count = data.pendingCount || 0;
+      if (count > 0) {
+        notificationBadge.textContent = count > 9 ? '9+' : count;
+        notificationBadge.style.display = 'flex';
+      } else {
+        notificationBadge.style.display = 'none';
+      }
+
+      if (notificationHeaderCount) {
+        notificationHeaderCount.textContent = `${count} pendientes`;
+      }
+
+      if (!notificationList) return;
+      if (!data.notifications || data.notifications.length === 0) {
+        notificationList.innerHTML = `<div class="notification-empty">No hay postulaciones de Fase 2 registradas</div>`;
+        return;
+      }
+
+      notificationList.innerHTML = data.notifications.map(n => {
+        const timeStr = n.phase2_submitted_at || n.token_used_at 
+          ? new Date(n.phase2_submitted_at || n.token_used_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' hrs'
+          : 'Reciente';
+        
+        const isPending = n.status === 'EN_REVISION_MANUAL' || n.status === 'DOCS_CARGADOS';
+        const statusClass = isPending ? 'status-revision' : 'status-approved';
+        const statusLabel = isPending ? 'Requiere Auditoría OCR' : 'Pre-Acreditado';
+
+        return `
+          <div class="notification-item" onclick="openCandidateFromNotification(${n.id})">
+            <div class="notification-item-top">
+              <span class="notification-item-name">${escapeHtml(n.full_name)}</span>
+              <span class="notification-item-time">${timeStr}</span>
+            </div>
+            <div class="notification-item-desc">${escapeHtml(n.rut_id)} · ${escapeHtml(n.position_name || 'Especialidad')}</div>
+            <div class="notification-item-footer">
+              <span class="status-pill ${statusClass}" style="font-size: 0.65rem; padding: 0.15rem 0.5rem;">${statusLabel}</span>
+              <span style="font-size: 0.75rem; color: var(--primary); font-weight: 700; text-decoration: underline;">Auditar &rarr;</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (e) {
+      console.warn('[Notificaciones] Error al consultar alertas:', e);
+    }
+  }
+
+  window.openCandidateFromNotification = (id) => {
+    if (notificationDropdown) notificationDropdown.style.display = 'none';
+    window.viewCandidate(id);
+  };
+
+  if (btnNotifications && notificationDropdown) {
+    btnNotifications.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isVisible = notificationDropdown.style.display === 'block';
+      notificationDropdown.style.display = isVisible ? 'none' : 'block';
+      if (!isVisible) {
+        loadNotifications();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!notificationDropdown.contains(e.target) && e.target !== btnNotifications) {
+        notificationDropdown.style.display = 'none';
+      }
+    });
+  }
+
   // Elementos de Scroll Sincronizado Superior
   const tableTopScroll = document.getElementById('table-top-scroll');
   const tableTopScrollInner = document.getElementById('table-top-scroll-inner');
@@ -220,11 +302,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const scorePercent = c.total_questions > 0 ? Math.round((c.score / c.total_questions) * 100) : 0;
         const expDisplay = c.experience_years ? `${c.experience_years} años` : `${c.age || 3} años`;
 
+        const hasRealDiscrepancy = Boolean(c.discrepancy_notes && !c.discrepancy_notes.includes('Expediente consistente. Sin observaciones.'));
         let crossCheckBadge = '<span class="badge-code">[FASE 01]</span>';
         if (c.ocr_cross_check_ok) {
           crossCheckBadge = '<span class="badge-code" style="color: var(--ecf-emerald); border-color: var(--ecf-emerald-border); background: var(--ecf-emerald-dim);">[CONFORME ECF]</span>';
         } else if (c.status === 'EN_REVISION_MANUAL') {
-          crossCheckBadge = '<span class="badge-code" style="color: var(--safety-yellow); border-color: var(--safety-yellow); background: var(--safety-yellow-dim);">[DISCORDANCIA OCR]</span>';
+          if (hasRealDiscrepancy) {
+            crossCheckBadge = '<span class="badge-code" style="color: var(--safety-yellow); border-color: var(--safety-yellow); background: var(--safety-yellow-dim);">[DISCORDANCIA OCR]</span>';
+          } else {
+            crossCheckBadge = '<span class="badge-code" style="color: var(--ecf-emerald); border-color: var(--ecf-emerald-border); background: var(--ecf-emerald-dim);">[EN REVISIÓN // CONFORME]</span>';
+          }
         } else if (c.status === 'DESCARTADO_TECNICO') {
           crossCheckBadge = '<span class="badge-code" style="color: var(--ecf-crimson); border-color: var(--ecf-crimson-border); background: var(--ecf-crimson-dim);">[NO CONFORME ECF]</span>';
         }
@@ -283,6 +370,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const scorePercent = candidate.total_questions > 0 ? Math.round((candidate.score / candidate.total_questions) * 100) : 0;
     const credencialUrl = candidate.credencial_file || candidate.cert_file;
     const carnetUrl = candidate.carnet_file;
+
+    const isExpedienteConforme = candidate.ocr_cross_check_ok || 
+      (!candidate.discrepancy_notes || candidate.discrepancy_notes.includes('Expediente consistente. Sin observaciones.'));
+    const diagBorder = isExpedienteConforme ? 'var(--ecf-emerald-border)' : 'var(--safety-yellow)';
+    const diagBg = isExpedienteConforme ? 'var(--ecf-emerald-dim)' : 'var(--safety-yellow-dim)';
+    const diagColor = isExpedienteConforme ? 'var(--ecf-emerald)' : 'var(--safety-yellow)';
 
     modalBody.innerHTML = `
       <div class="info-grid">
@@ -360,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p><strong>4. Cert. Antecedentes (OCR):</strong><br>${escapeHtml(candidate.ocr_antecedentes_status || 'Pendiente Fase 2')}</p>
         </div>
 
-        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald-border)' : 'var(--safety-yellow)'}; background: ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald-dim)' : 'var(--safety-yellow-dim)'}; color: ${candidate.ocr_cross_check_ok ? 'var(--ecf-emerald)' : 'var(--safety-yellow)'}; font-size: 0.85rem; font-family: 'IBM Plex Mono', monospace;">
+        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid ${diagBorder}; background: ${diagBg}; color: ${diagColor}; font-size: 0.85rem; font-family: 'IBM Plex Mono', monospace;">
           <strong>DIAGNÓSTICO NORMATIVO (ECF / DS N° 132):</strong><br>
           ${escapeHtml(candidate.discrepancy_notes || 'Expediente consistente. Sin observaciones.')}
           ${candidate.ocr_manually_edited ? `<br><em>Nota de Auditoría: El postulante editó manualmente en Fase 1: ${escapeHtml(candidate.ocr_edited_fields || '')}</em>` : ''}
@@ -385,7 +478,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap; margin-top:0.65rem;">
           ${credencialUrl ? `<a href="${credencialUrl}" target="_blank" class="btn btn-secondary">Ver Credencial Técnica</a>` : ''}
           ${candidate.cv_file ? `<a href="${candidate.cv_file}" target="_blank" class="btn btn-secondary">Ver CV</a>` : ''}
-          ${carnetUrl ? `<a href="${carnetUrl}" target="_blank" class="btn btn-secondary">Ver Cédula</a>` : ''}
+          ${carnetUrl ? `<a href="${carnetUrl}" target="_blank" class="btn btn-secondary">Ver Cédula (Frente)</a>` : ''}
+          ${candidate.carnet_back_file ? `<a href="${candidate.carnet_back_file}" target="_blank" class="btn btn-secondary">Ver Cédula (Reverso)</a>` : ''}
           ${candidate.antecedentes_file ? `<a href="${candidate.antecedentes_file}" target="_blank" class="btn btn-secondary">Ver Antecedentes</a>` : ''}
           <a href="/api/admin/candidates/${candidate.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-primary">
             Generar Carpeta WebControl (PDF / Estandarizado)
@@ -394,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
 
       <!-- Acción Operativa de Aprobación de Acceso a Faena (Fase 2) -->
-      ${candidate.status === 'PRESELECCIONADO' ? `
+      ${['PRESELECCIONADO', 'EN_REVISION_MANUAL'].includes(candidate.status) && !candidate.carnet_file && !candidate.access_token ? `
         <div style="background: rgba(255, 184, 0, 0.08); border: 1px solid var(--safety-yellow); padding: 1.15rem; border-radius: var(--radius-terminal); margin-top: 1rem; text-align: left;">
           <div style="font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; font-weight: 700; color: var(--safety-yellow); margin-bottom: 0.35rem;">
             [ACCIÓN DE RR.HH.: AUTORIZAR ACCESO A FAENA]
@@ -408,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       ` : ''}
 
-      ${candidate.status === 'APROBADO_FAENA' ? `
+      ${(candidate.status === 'APROBADO_FAENA' || (candidate.access_token && !candidate.carnet_file)) ? `
         <div class="modal-token-card">
           <div class="modal-token-card-header">
             <span>[ACCESO A FAENA APROBADO // ENLACE FASE 2 ACTIVO]</span>
@@ -425,9 +519,6 @@ document.addEventListener('DOMContentLoaded', () => {
               <button type="button" class="btn btn-secondary btn-sm" onclick="copyMagicLinkToClipboard('${window.location.origin}/?token=${candidate.access_token}', this)">
                 [ COPIAR ENLACE FASE 2 ]
               </button>
-              <a href="${window.location.origin}/?token=${candidate.access_token}" target="_blank" class="btn btn-primary btn-sm" style="text-decoration: none;">
-                [ ABRIR FASE 2 DIRECTAMENTE ]
-              </a>
             ` : ''}
             <button type="button" class="btn btn-sm" style="border: 1px solid var(--border-structural); color: var(--text-secondary);" id="btn-approve-faena" onclick="approveFaena(${candidate.id})">
               [ RE-DESPACHAR CORREO ]
@@ -518,13 +609,20 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ status })
       });
 
+      const data = await res.json();
       if (res.ok) {
-        showToast(`Estado actualizado a ${status}.`, 'success');
+        if (status === 'CONTRATADO_FAENA' && data.mail_sent) {
+          showToast(`[CONTRATADO] Estado actualizado y correo de confirmación enviado al postulante.`, 'success');
+        } else if (status === 'CONTRATADO_FAENA' && data.mail_simulated) {
+          showToast(`[CONTRATADO] Estado actualizado (Correo simulado en consola).`, 'success');
+        } else {
+          showToast(`Estado actualizado a ${status}.`, 'success');
+        }
         modalCandidate.style.display = 'none';
         loadCandidates();
         loadStats();
       } else {
-        showToast('Error actualizando el estado en la máquina de estados.', 'error');
+        showToast(data.error || 'Error actualizando el estado en la máquina de estados.', 'error');
       }
     } catch (e) {
       showToast('Error de conexión al actualizar estado.', 'error');
@@ -540,6 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
   btnRefresh.addEventListener('click', () => {
     loadCandidates();
     loadStats();
+    loadNotifications();
   });
 
   function escapeHtml(str) {
@@ -552,4 +651,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPositions();
   loadStats();
   loadCandidates();
+  loadNotifications();
+  setInterval(loadNotifications, 30000);
 });

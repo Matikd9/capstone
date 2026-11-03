@@ -220,9 +220,14 @@
                   <div class="ocr-autofill-header">
                     <div>
                       <h3>Información Personal</h3>
-                      <p class="field-hint">Hemos completado sus datos automáticamente a partir de los documentos cargados. Por favor verifique o edite cualquier campo antes de continuar.</p>
+                      <p class="field-hint" id="ocr-autofill-desc">Por favor cargue sus documentos y espere a que finalice la lectura automática para habilitar y verificar sus datos.</p>
                     </div>
-                    <span class="status-pill status-Aprobado" id="ocr-badge-indicator">DATOS COMPLETADOS</span>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                      <button type="button" id="btn-unlock-manual" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; padding: 0.35rem 0.65rem;" title="Habilitar campos para ingreso manual">
+                        Completar manualmente
+                      </button>
+                      <span class="status-pill status-Pendiente" id="ocr-badge-indicator">ESPERANDO DOCUMENTOS</span>
+                    </div>
                   </div>
 
                   <!-- Elementos de compatibilidad en segundo plano -->
@@ -236,37 +241,40 @@
                   <div class="form-grid">
                     <div class="field-group">
                       <label for="full_name">Nombre Completo *</label>
-                      <input type="text" id="full_name" placeholder="ej. Juan Carlos Pérez González" required>
+                      <input type="text" id="full_name" placeholder="ej. Juan Carlos Pérez González" required disabled>
                       <span class="field-hint" id="hint-name">Nombre tal como figura en su credencial o cédula</span>
                     </div>
 
                     <div class="field-group">
                       <label for="rut_id">RUT / RUN *</label>
-                      <input type="text" id="rut_id" placeholder="ej. 15.678.901-2" required>
+                      <input type="text" id="rut_id" placeholder="ej. 15.678.901-2" required disabled>
                       <span class="field-hint" id="hint-rut">Formato con puntos y guion. Se validará con Cédula en Fase 2</span>
                     </div>
 
                     <div class="field-group">
                       <label for="email">Correo Electrónico *</label>
-                      <input type="email" id="email" placeholder="ej. jperez@correo.cl" required>
+                      <input type="email" id="email" placeholder="ej. jperez@correo.cl" required disabled>
                       <span class="field-hint" id="hint-email">Canal oficial para citaciones a faena y resultados</span>
                     </div>
 
                     <div class="field-group">
                       <label for="phone">Teléfono de Contacto *</label>
-                      <input type="text" id="phone" placeholder="ej. +56 9 8765 4321" required>
-                      <span class="field-hint" id="hint-phone">Número de contacto directo para avisos de faena</span>
+                      <div class="phone-input-group" id="phone-group">
+                        <span class="phone-prefix-addon" aria-hidden="true">+56 9</span>
+                        <input type="tel" id="phone" class="phone-input-control" placeholder="8765 4321" maxlength="9" required autocomplete="tel-national" disabled>
+                      </div>
+                      <span class="field-hint" id="hint-phone">Ingrese los 8 dígitos de su celular (ej. 9796 2837)</span>
                     </div>
 
                     <div class="field-group">
                       <label for="city">Ciudad / Comuna de Residencia *</label>
-                      <input type="text" id="city" placeholder="ej. Rancagua / Santiago" required>
+                      <input type="text" id="city" placeholder="ej. Rancagua / Santiago" required disabled>
                       <span class="field-hint" id="hint-city">Indique su comuna habitual de residencia</span>
                     </div>
 
                     <div class="field-group">
                       <label for="experience_years">Años de Experiencia en Minería / Industria *</label>
-                      <input type="number" id="experience_years" min="0" max="45" placeholder="ej. 4" required>
+                      <input type="number" id="experience_years" min="0" max="45" placeholder="ej. 4" required disabled>
                       <span class="field-hint alert-hint" id="hint-exp">Los estándares ECF Codelco exigen experiencia comprobable.</span>
                     </div>
                   </div>
@@ -391,7 +399,7 @@
               </div>
 
               <form id="form-phase2" class="custom-form">
-                <div class="docs-section docs-three-cols">
+                <div class="docs-section docs-phase2-grid">
                   <div class="doc-box" id="box-carnet-front">
                     <label for="file-carnet-front">Cédula de Identidad (Frente) *</label>
                     <div class="industrial-dropzone" id="dropzone-carnet-front" data-input-id="file-carnet-front">
@@ -420,9 +428,9 @@
                   </div>
 
                   <div class="doc-box" id="box-carnet-back">
-                    <label for="file-carnet-back">Cédula de Identidad (Reverso)</label>
+                    <label for="file-carnet-back">Cédula de Identidad (Reverso) *</label>
                     <div class="industrial-dropzone" id="dropzone-carnet-back" data-input-id="file-carnet-back">
-                      <input type="file" id="file-carnet-back" accept="image/*,.pdf" class="visually-hidden">
+                      <input type="file" id="file-carnet-back" accept="image/*,.pdf" class="visually-hidden" required>
                       <div class="dropzone-empty">
                         <div class="dropzone-icon-circle">
                           <svg class="dropzone-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
@@ -443,10 +451,10 @@
                       </div>
                       <div class="dropzone-error-msg" style="display:none;"></div>
                     </div>
-                    <span class="file-status" id="carnet-back-status">Reverso con número de documento</span>
+                    <span class="file-status" id="carnet-back-status">Reverso con código QR y chip</span>
                   </div>
 
-                  <div class="doc-box" id="box-antecedentes">
+                  <div class="doc-box doc-box-full-width" id="box-antecedentes">
                     <label for="file-antecedentes">Certificado de Antecedentes *</label>
                     <div class="industrial-dropzone" id="dropzone-antecedentes" data-input-id="file-antecedentes">
                       <input type="file" id="file-antecedentes" accept="image/*,.pdf" class="visually-hidden" required>
@@ -520,21 +528,21 @@
         <aside class="portal-aside-column" id="panel-ayuda">
           
           <!-- Tarjeta de Requisitos Clave -->
-          <div class="aside-card">
+          <div class="aside-card" id="aside-card-phase1-docs">
             <div class="aside-card-header">
               <h4>Documentos para Postular</h4>
             </div>
             
             <ul class="aside-checklist">
               <li>
-                <span class="check-icon">✓</span>
+                <span class="check-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                 <div>
                   <strong>Credencial Técnica Habilitante:</strong>
                   <p>Carnet Rigger (Riggers), WPQ estampilla vigente (Soldadores) o Licencia D (Operadores).</p>
                 </div>
               </li>
               <li>
-                <span class="check-icon">✓</span>
+                <span class="check-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                 <div>
                   <strong>Currículum Vitae Actualizado:</strong>
                   <p>Detallando faenas anteriores y experiencia comprobable en terreno.</p>

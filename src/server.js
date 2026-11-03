@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 const { createWorker } = require('tesseract.js');
-require('dotenv').config({ override: true });
+require('dotenv').config();
 
 const geminiOcr = require('./geminiOcr');
 const mailer = require('./mailer');
@@ -89,9 +89,13 @@ const VALID_STATES = [
 
 async function initDB(retries = 10, delay = 3000) {
   const targetDb = process.env.DB_NAME || 'web_app';
+  const isTiDB = (process.env.DB_HOST && process.env.DB_HOST.includes('tidbcloud.com')) || process.env.DB_PORT === '4000';
+  const envMode = isTiDB ? 'PRODUCCIÓN (TiDB Cloud)' : 'DESARROLLO LOCAL (MySQL)';
+
   for (let i = 0; i < retries; i++) {
     try {
-      console.log(`[DB] Conectando a MySQL (${i + 1}/${retries})...`);
+      console.log(`[DB] Conectando a ${envMode} (Intento ${i + 1}/${retries})...`);
+      console.log(`[DB] Configuración: host=${dbConfig.host || dbConfig.socketPath}, port=${dbConfig.port || 'default'}, db=${targetDb}`);
 
       // 1. Intentar conexión directa al pool con la base de datos objetivo
       try {
@@ -216,13 +220,19 @@ async function initDB(retries = 10, delay = 3000) {
         'ALTER TABLE candidates ADD COLUMN score_tecnico INT DEFAULT 0',
         'ALTER TABLE candidates ADD COLUMN score_sjt INT DEFAULT 0',
         'ALTER TABLE candidates ADD COLUMN sjt_conforme BOOLEAN DEFAULT FALSE',
-        'ALTER TABLE candidates ADD COLUMN access_token VARCHAR(64) UNIQUE',
+        'ALTER TABLE candidates ADD COLUMN access_token VARCHAR(64)',
         'ALTER TABLE candidates ADD COLUMN token_expires_at DATETIME',
-        'ALTER TABLE candidates ADD COLUMN token_used_at DATETIME'
+        'ALTER TABLE candidates ADD COLUMN token_used_at DATETIME',
+        'ALTER TABLE candidates ADD COLUMN phase2_submitted_at DATETIME'
       ];
       for (const sql of candidateMigrations) {
         try { await conn.query(sql); } catch (e) {}
       }
+
+      // Asegurar índice único en access_token de forma idempotente
+      try {
+        await conn.query('ALTER TABLE candidates ADD UNIQUE INDEX uq_candidates_access_token (access_token)');
+      } catch (idxErr) {}
 
       console.log('[DB] Tablas y Máquina de Estados MySQL verificadas exitosamente.');
 
@@ -714,6 +724,33 @@ function pickBestPersonName(candidatesList, referenceNameOrEmail = null) {
   return bestName;
 }
 
+function parseChileanDate(rawDateStr) {
+  if (!rawDateStr) return null;
+  const str = String(rawDateStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return new Date(str + 'T12:00:00Z');
+  }
+  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(str)) {
+    const parts = str.split(/[\/\-]/).map(Number);
+    return new Date(parts[2], parts[1] - 1, parts[0], 12, 0, 0);
+  }
+  const meses = {
+    enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+    julio: 6, agosto: 7, septiembre: 8, setiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
+  };
+  const match = str.toLowerCase().match(/(\d{1,2})\s+(?:de\s+)?([a-z]+)\s+(?:de\s+)?(\d{4})/);
+  if (match) {
+    const d = parseInt(match[1], 10);
+    const mName = match[2];
+    const y = parseInt(match[3], 10);
+    if (meses[mName] !== undefined) {
+      return new Date(y, meses[mName], d, 12, 0, 0);
+    }
+  }
+  const fallback = new Date(str);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
 function isValidChileanRutMod11(rawRut) {
   if (!rawRut) return false;
   const clean = String(rawRut).replace(/[^0-9kK]/g, '').toUpperCase();
@@ -818,6 +855,14 @@ function calculateExperienceFromSections(sections, fullTextWithoutRefs) {
   const expText = sections.EXPERIENCIA || '';
   if (!expText) {
     return { years: null, months: null };
+  }
+
+  // Si la experiencia solo contiene trabajos de retail/supermercado/panadería y no hay menciones industriales o mineras:
+  const isRetailOnly = /\b(supermercado|jumbo|lider|panader[íi]a|panadero|cajer[oa]|reponedor|garz[óo]n|mesero|comida\s+r[áa]pida|mcdonald|retail|falabella|ripley|atenci[óo]n\s+al\s+cliente)\b/i.test(expText);
+  const hasIndustrialOrMining = /\b(miner[íi]a|minera|faena|parada|planta|concentradora|fundici[óo]n|refiner[íi]a|montaje|mantenimiento|izaje|rigger|soldad|calderer|maquinaria|ecf|subterr[áa]nea|rajo|codelco|bhp|anglo|pelambres|collahuasi|chute|tub[ée]r|piping|mecanic|estructur)\b/i.test(expText);
+
+  if (isRetailOnly && !hasIndustrialOrMining) {
+    return { years: 0, months: 0 };
   }
 
   // Excluir bloques de prácticas estudiantiles/operarias/profesionales (ej. "Practica operaria ... enero-febrero 2025")
@@ -1041,9 +1086,34 @@ function parseExtractedText(rawText) {
                      textWithoutRefs.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
   const detectedEmail = emailMatch ? emailMatch[0].toLowerCase() : null;
 
-  const phoneRegex = /(?:\(?\+?56\)?[\s\-]*9[\s\-]*\d{4}[\s\-]*\d{4}|\b9[\s\-]*\d{4}[\s\-]*\d{4}\b)/;
-  const phoneMatch = personalContactText.match(phoneRegex) || textWithoutRefs.match(phoneRegex);
-  const detectedPhone = phoneMatch ? phoneMatch[0].replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim() : null;
+  // 2a. Extracción de Teléfono Chileno (Etiqueta explícita o patrón numérico móvil)
+  let detectedPhone = null;
+  const combinedContactText = `${personalContactText}\n${textWithoutRefs}`;
+
+  // Prioridad 1: Etiqueta explícita de contacto (Teléfono, Celular, Fono, WhatsApp, Móvil, Wsp, Cel)
+  const explicitPhoneMatch = combinedContactText.match(
+    /(?:tel[eé]fono|celular|m[oó]vil|fono|whatsapp|cel|wsp|contact[o]?)\s*[:.-]?\s*(\+?56[\s.-]*)?(?:9[\s.-]*)?(\d{4}[\s.-]*\d{4}|\d{8})/i
+  );
+  if (explicitPhoneMatch) {
+    const rawDigits = explicitPhoneMatch[0].replace(/\D/g, '');
+    if (rawDigits.length >= 8) {
+      const p8 = rawDigits.slice(-8);
+      detectedPhone = `+56 9 ${p8.slice(0, 4)} ${p8.slice(4)}`;
+    }
+  }
+
+  // Prioridad 2: Patrón genérico móvil chileno (ej. +56 9 8765 4321, 987654321, 9 8765 4321, etc.)
+  if (!detectedPhone) {
+    const phoneRegex = /(?:\+?56[\s.-]*)?9[\s.-]*\d{4}[\s.-]*\d{4}|\b9\d{8}\b|\b(?:\+?56[\s.-]*)?9[\s.-]*\d{8}\b/;
+    const phoneMatch = personalContactText.match(phoneRegex) || textWithoutRefs.match(phoneRegex);
+    if (phoneMatch) {
+      const rawDigits = phoneMatch[0].replace(/\D/g, '');
+      if (rawDigits.length >= 8) {
+        const p8 = rawDigits.slice(-8);
+        detectedPhone = `+56 9 ${p8.slice(0, 4)} ${p8.slice(4)}`;
+      }
+    }
+  }
 
   let detectedCity = null;
   const cityNamesRegex = /\b(Santiago|Rancagua|Machal[íi]|Calama|Antofagasta|Copiap[óo]|Iquique|Concepci[óo]n|Valpara[íi]so|Vi[ñn]a\s+del\s+Mar|La\s+Serena|Coquimbo|Talca|Temuco|Puerto\s+Montt|Punta\s+Arenas|Arica|Curic[óo]|Los\s+Andes|San\s+Fernando|Coya|Lampa|Colina|Quilicura|Maip[úu]|Puente\s+Alto|San\s+Bernardo|Providencia|Las\s+Condes|Pe[ñn]alol[ée]n)\b/i;
@@ -1621,6 +1691,10 @@ app.post('/api/ocr/phase1', async (req, res) => {
           ocr_engine: 'GEMINI_FLASH',
           model_used: geminiData.used_model || 'gemini',
           full_name: geminiData.full_name || '',
+          name_source: geminiData.name_source || (geminiData.full_name ? (geminiData.name_credencial ? 'CREDENCIAL' : 'CV') : 'NO_DETECTADO'),
+          name_credencial: geminiData.name_credencial || null,
+          name_cv: geminiData.name_cv || null,
+          name_discrepancia: Boolean(geminiData.name_discrepancia),
           rut_id: geminiData.rut_id || '',
           rut_source: geminiData.rut_source || (geminiData.rut_id ? 'CV' : 'NO_DETECTADO'),
           rut_credencial: geminiData.rut_credencial || null,
@@ -1688,13 +1762,40 @@ app.post('/api/ocr/phase1', async (req, res) => {
       rutId = '';
     }
 
-    const bestName = (rutSource === 'CREDENCIAL' && cred.detected_name)
-      ? cred.detected_name
-      : pickBestPersonName([cred.detected_name, cv.detected_name], cv.detected_email || cred.detected_email) || '';
+    const nameCred = cred.detected_name || null;
+    const nameCv = cv.detected_name || null;
+    let bestName = nameCv;
+    let nameSource = 'CV';
+    let nameDiscrepancy = false;
+
+    if (!nameCv && nameCred) {
+      bestName = nameCred;
+      nameSource = 'CREDENCIAL';
+    } else if (nameCv && nameCred) {
+      const cleanCvName = normalizeTextForMatch(nameCv);
+      const cleanCredName = normalizeTextForMatch(nameCred);
+      if (cleanCvName && cleanCredName && cleanCvName !== cleanCredName) {
+        nameDiscrepancy = true;
+        bestName = nameCred; // Prioridad oficial
+        nameSource = 'DISCREPANCIA';
+        const nameNote = `Nombre en CV (${nameCv}) difiere de Licencia/Credencial (${nameCred}).`;
+        discrepancyNote = discrepancyNote ? `${discrepancyNote} | ${nameNote}` : `Discrepancia detectada: ${nameNote}`;
+      } else {
+        nameSource = 'AMBOS_COINCIDENTES';
+        bestName = nameCred || nameCv;
+      }
+    } else if (!nameCv && !nameCred) {
+      nameSource = 'NO_DETECTADO';
+      bestName = '';
+    }
 
     res.json({
       ocr_engine: 'LOCAL_TESSERACT',
       full_name: bestName,
+      name_source: nameSource,
+      name_credencial: nameCred,
+      name_cv: nameCv,
+      name_discrepancia: nameDiscrepancy,
       rut_id: rutId,
       rut_source: rutSource,
       rut_credencial: rutCred,
@@ -1862,7 +1963,7 @@ app.post('/api/candidates/phase1-submit', async (req, res) => {
     }
 
     const discrepancyNotesList = [...rejectionReasons];
-    if (phase1_ocr_data && phase1_ocr_data.rut_discrepancia && phase1_ocr_data.discrepancia_nota) {
+    if (phase1_ocr_data && (phase1_ocr_data.rut_discrepancia || phase1_ocr_data.name_discrepancia) && phase1_ocr_data.discrepancia_nota) {
       discrepancyNotesList.push(`[AUDITORÍA DOCUMENTAL FASE 1]: ${phase1_ocr_data.discrepancia_nota}`);
     }
 
@@ -1936,6 +2037,17 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
     const { id } = req.params;
     const { carnet_file, carnet_back_file, antecedentes_file, consent_ley19628 } = req.body;
 
+    // Regla de Integridad: Un evaluador administrativo no puede subir antecedentes a nombre del postulante
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const maybeAdmin = auth.verifyToken(authHeader.split(' ')[1]);
+      if (maybeAdmin && maybeAdmin.role) {
+        return res.status(403).json({
+          error: 'Operación no permitida: Los administradores no pueden cargar documentos de identidad en nombre del postulante.'
+        });
+      }
+    }
+
     if (!carnet_file || !antecedentes_file) {
       return res.status(400).json({ error: 'Debe adjuntar la Cédula de Identidad y el Certificado de Antecedentes para la Pre-Acreditación.' });
     }
@@ -1948,6 +2060,13 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
       return res.status(404).json({ error: 'Postulación no encontrada.' });
     }
     const candidate = candRows[0];
+
+    // Regla de Integridad: Si la documentación ya fue finalizada previamente, bloquear reenvío
+    if (candidate.phase2_submitted_at || ['PRE_ACREDITADO', 'CONTRATADO_FAENA'].includes(candidate.status)) {
+      return res.status(409).json({
+        error: 'Su documentación de Fase 2 ya fue enviada y se encuentra registrada en el sistema de acreditación.'
+      });
+    }
 
     // Regla de corte: El candidato solo puede acceder a Fase 2 si fue APROBADO_FAENA por RR.HH.
     const allowedStatuses = ['APROBADO_FAENA', 'DOCS_CARGADOS', 'EN_REVISION_MANUAL', 'PRE_ACREDITADO'];
@@ -1994,11 +2113,57 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
           effectiveCandidateName = ocrCarnetName;
           ocrCarnetRut = g2.carnet_rut || candidate.rut_id;
           ocrCarnetVigencia = g2.carnet_vigencia || (g2.carnet_vigente_bool ? 'Vigente' : 'Vencido');
-          ocrAntecedentesStatus = g2.antecedentes_status || (g2.tiene_anotaciones_penales ? 'Con Anotaciones Penales' : 'Sin Anotaciones');
-          crossCheckOk = Boolean(g2.cross_check_ok);
-          if (g2.discrepancy_notes && !crossCheckOk) {
-            discrepancies.push(g2.discrepancy_notes);
+          
+          // Cálculo DETERMINISTA de vigencia de antecedentes en JavaScript (máx. 60 días de antigüedad)
+          let antecedentesVigente = true;
+          let diasAntiguedad = null;
+          if (g2.antecedentes_fecha_emision) {
+            const rawDate = String(g2.antecedentes_fecha_emision).trim();
+            const parsedDate = parseChileanDate(rawDate);
+            if (parsedDate && !isNaN(parsedDate.getTime())) {
+              const now = new Date();
+              diasAntiguedad = Math.floor((now - parsedDate) / (1000 * 60 * 60 * 24));
+              if (diasAntiguedad > 60) {
+                antecedentesVigente = false;
+                discrepancies.push(`Certificado de antecedentes vencido (emitido hace ${diasAntiguedad} días, límite normativo 60 días).`);
+              } else if (diasAntiguedad < -2) {
+                antecedentesVigente = false;
+                discrepancies.push(`Certificado de antecedentes presenta fecha futura inconsistente (${rawDate}).`);
+              }
+            }
           }
+
+          const tieneAnotaciones = Boolean(g2.tiene_anotaciones_penales || (g2.antecedentes_status && g2.antecedentes_status.includes('Con Anotaciones')));
+          if (tieneAnotaciones) {
+            ocrAntecedentesStatus = 'Con Anotaciones Penales';
+            discrepancies.push('Certificado de Antecedentes registra anotaciones penales que requieren revisión de RR.HH.');
+          } else {
+            ocrAntecedentesStatus = (diasAntiguedad !== null && antecedentesVigente) 
+              ? `Limpio / Vigente (${diasAntiguedad} días)`
+              : 'Limpio / Sin Anotaciones';
+          }
+
+          // Validación de identidad contra Fase 1
+          const cleanCandRut = (candidate.rut_id || '').replace(/[^0-9kK]/g, '').toUpperCase();
+          const cleanCarnetRut = (ocrCarnetRut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+          const rutOk = !cleanCarnetRut || cleanCarnetRut === cleanCandRut;
+          if (!rutOk) {
+            discrepancies.push(`Discordancia de RUT: Fase 1 (${candidate.rut_id}) vs. Cédula (${ocrCarnetRut}).`);
+          }
+
+          const carnetVigente = g2.carnet_vigente_bool !== false && !String(ocrCarnetVigencia).toLowerCase().startsWith('vencid');
+
+          crossCheckOk = rutOk && carnetVigente && antecedentesVigente && !tieneAnotaciones;
+
+          if (crossCheckOk) {
+            discrepancies = [];
+          } else if (g2.discrepancy_notes && discrepancies.length === 0) {
+            // Filtrar menciones falsas de "fecha futura" si el cálculo matemático confirmó vigencia
+            if (!g2.discrepancy_notes.includes('fecha de emisión futura') || !antecedentesVigente) {
+              discrepancies.push(g2.discrepancy_notes);
+            }
+          }
+
           combinedText = `[MOTOR: GEMINI FLASH]\nCédula: ${ocrCarnetName} (${ocrCarnetRut}) - ${ocrCarnetVigencia}\nAntecedentes: ${ocrAntecedentesStatus}\nCruce Identidad: ${crossCheckOk ? 'CONFORME' : 'CON DISCORDANCIAS'}`;
         }
       } catch (geminiErr) {
@@ -2103,7 +2268,8 @@ app.post('/api/candidates/:id/phase2-acreditacion', async (req, res) => {
         ocr_cross_check_ok = ?,
         discrepancy_notes = ?,
         consent_ley19628 = 1,
-        token_used_at = NOW()
+        token_used_at = NOW(),
+        phase2_submitted_at = NOW()
       WHERE id = ?`,
       [
         effectiveCandidateName,
@@ -2153,7 +2319,9 @@ app.get('/api/candidates/access/:token', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT c.id, c.full_name, c.rut_id, c.email, c.phone, c.city, c.experience_years, 
               c.position_id, c.status, c.score_tecnico, c.score_sjt, c.sjt_conforme, 
-              c.token_expires_at, p.name as position_name, p.required_credential
+              c.token_expires_at, c.token_used_at, c.phase2_submitted_at, c.carnet_file,
+              c.ocr_carnet_vigencia, c.ocr_antecedentes_status, c.discrepancy_notes,
+              p.name as position_name, p.required_credential
        FROM candidates c
        LEFT JOIN positions p ON c.position_id = p.id
        WHERE c.access_token = ?`,
@@ -2174,7 +2342,7 @@ app.get('/api/candidates/access/:token', async (req, res) => {
     }
 
     // Regla de corte: Debe estar aprobado para faena por RR.HH.
-    const allowedStatuses = ['APROBADO_FAENA', 'DOCS_CARGADOS', 'EN_REVISION_MANUAL', 'PRE_ACREDITADO'];
+    const allowedStatuses = ['APROBADO_FAENA', 'DOCS_CARGADOS', 'EN_REVISION_MANUAL', 'PRE_ACREDITADO', 'CONTRATADO_FAENA', 'DESCARTADO_TECNICO'];
     if (!allowedStatuses.includes(c.status)) {
       return res.status(403).json({
         error: 'Su postulación aún no cuenta con la aprobación formal de acceso a faena por parte de RR.HH.'
@@ -2195,7 +2363,13 @@ app.get('/api/candidates/access/:token', async (req, res) => {
       status: c.status,
       score_tecnico: c.score_tecnico,
       score_sjt: c.score_sjt,
-      sjt_conforme: c.sjt_conforme
+      sjt_conforme: c.sjt_conforme,
+      token_used_at: c.token_used_at,
+      phase2_submitted_at: c.phase2_submitted_at,
+      carnet_file: c.carnet_file,
+      ocr_carnet_vigencia: c.ocr_carnet_vigencia,
+      ocr_antecedentes_status: c.ocr_antecedentes_status,
+      discrepancy_notes: c.discrepancy_notes
     });
   } catch (err) {
     console.error('[Error /api/candidates/access/:token]:', err);
@@ -2282,14 +2456,47 @@ app.post('/api/admin/candidates/:id/approve-faena', auth.requireAdminAuth, async
     const candidate = candRows[0];
     const { token, expiresAt } = mailer.generateAccessToken(7);
 
-    await pool.query(
-      `UPDATE candidates 
-       SET status = 'APROBADO_FAENA', 
-           access_token = ?, 
-           token_expires_at = ? 
-       WHERE id = ?`,
-      [token, expiresAt, id]
-    );
+    try {
+      await pool.query(
+        `UPDATE candidates 
+         SET status = 'APROBADO_FAENA', 
+             access_token = ?, 
+             token_expires_at = ? 
+         WHERE id = ?`,
+        [token, expiresAt, id]
+      );
+    } catch (dbErr) {
+      if (dbErr.code === 'ER_BAD_FIELD_ERROR' || (dbErr.message && dbErr.message.includes('access_token'))) {
+        console.warn('[DB Auto-Healing] Columna access_token no detectada en candidatos. Aplicando migración dinámica en caliente...');
+        try {
+          await pool.query('ALTER TABLE candidates ADD COLUMN access_token VARCHAR(64)');
+        } catch (e) {}
+        try {
+          await pool.query('ALTER TABLE candidates ADD UNIQUE INDEX uq_candidates_access_token (access_token)');
+        } catch (e) {}
+        try {
+          await pool.query('ALTER TABLE candidates ADD COLUMN token_expires_at DATETIME');
+        } catch (e) {}
+        try {
+          await pool.query('ALTER TABLE candidates ADD COLUMN token_used_at DATETIME');
+        } catch (e) {}
+        try {
+          await pool.query('ALTER TABLE candidates ADD COLUMN phase2_submitted_at DATETIME');
+        } catch (e) {}
+
+        // Reintentar actualización tras auto-healing
+        await pool.query(
+          `UPDATE candidates 
+           SET status = 'APROBADO_FAENA', 
+               access_token = ?, 
+               token_expires_at = ? 
+           WHERE id = ?`,
+          [token, expiresAt, id]
+        );
+      } else {
+        throw dbErr;
+      }
+    }
 
     const protocol = req.protocol;
     const host = req.get('host');
@@ -2366,7 +2573,39 @@ app.patch('/api/admin/candidates/:id/status', auth.requireAdminAuth, async (req,
     }
 
     await pool.query('UPDATE candidates SET status = ? WHERE id = ?', [status, id]);
-    res.json({ message: `Candidato #${id} actualizado a estado "${status}".` });
+
+    let mailSent = false;
+    let mailSimulated = false;
+
+    // Si es contratado para faena, despachar correo formal de acreditación y bienvenida
+    if (status === 'CONTRATADO_FAENA') {
+      try {
+        const [rows] = await pool.query(
+          `SELECT c.full_name, c.email, p.name as position_name 
+           FROM candidates c 
+           LEFT JOIN positions p ON c.position_id = p.id 
+           WHERE c.id = ?`,
+          [id]
+        );
+        if (rows.length > 0 && rows[0].email) {
+          const mailRes = await mailer.sendHiredConfirmationEmail({
+            email: rows[0].email,
+            full_name: rows[0].full_name,
+            position_name: rows[0].position_name
+          });
+          mailSent = mailRes.sent;
+          mailSimulated = mailRes.simulated;
+        }
+      } catch (mailErr) {
+        console.warn('[Error despachando correo de contratación]:', mailErr.message);
+      }
+    }
+
+    res.json({ 
+      message: `Candidato #${id} actualizado a estado "${status}".`,
+      mail_sent: mailSent,
+      mail_simulated: mailSimulated
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2402,6 +2641,39 @@ app.get('/api/admin/stats', auth.requireAdminAuth, async (req, res) => {
       savedTurnoverCostsCLP: savedTurnoverCosts
     });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8.5 PANEL RR.HH. NEXXO: Centro de Notificaciones de Fase 2
+app.get('/api/admin/notifications', auth.requireAdminAuth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        c.id, 
+        c.full_name, 
+        c.rut_id, 
+        c.status, 
+        c.phase2_submitted_at, 
+        c.token_used_at,
+        c.ocr_cross_check_ok,
+        p.name as position_name
+      FROM candidates c
+      LEFT JOIN positions p ON c.position_id = p.id
+      WHERE c.phase2_submitted_at IS NOT NULL OR c.token_used_at IS NOT NULL
+      ORDER BY COALESCE(c.phase2_submitted_at, c.token_used_at) DESC
+      LIMIT 15
+    `);
+
+    const pendingReview = rows.filter(r => r.status === 'EN_REVISION_MANUAL' || r.status === 'DOCS_CARGADOS');
+
+    res.json({
+      success: true,
+      pendingCount: pendingReview.length,
+      notifications: rows
+    });
+  } catch (err) {
+    console.error('[Error /api/admin/notifications]:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2494,9 +2766,14 @@ app.get('/api/admin/candidates/:id/export-webcontrol', auth.requireAdminAuth, as
       </thead>
       <tbody>
         <tr>
-          <td><code>${prefix}_Cedula_Identidad.jpg</code></td>
+          <td><code>${prefix}_Cedula_Identidad_Frente.jpg</code></td>
           <td>Cédula de Identidad (Frente)</td>
-          <td>${c.carnet_file ? `<a href="${c.carnet_file}" target="_blank" download="${prefix}_Cedula_Identidad.jpg">Descargar Archivo</a>` : 'Pendiente'}</td>
+          <td>${c.carnet_file ? `<a href="${c.carnet_file}" target="_blank" download="${prefix}_Cedula_Identidad_Frente.jpg">Descargar Archivo</a>` : 'Pendiente'}</td>
+        </tr>
+        <tr>
+          <td><code>${prefix}_Cedula_Identidad_Reverso.jpg</code></td>
+          <td>Cédula de Identidad (Reverso)</td>
+          <td>${c.carnet_back_file ? `<a href="${c.carnet_back_file}" target="_blank" download="${prefix}_Cedula_Identidad_Reverso.jpg">Descargar Archivo</a>` : 'Pendiente'}</td>
         </tr>
         <tr>
           <td><code>${prefix}_Certificado_Antecedentes.jpg</code></td>

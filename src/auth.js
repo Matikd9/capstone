@@ -5,7 +5,7 @@
 
 const crypto = require('crypto');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'nexxo-mining-division-teniente-secret-2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-nexxo-2026';
 const TOKEN_EXPIRY_SECONDS = 8 * 60 * 60; // 8 horas (Jornada laboral completa)
 
 /**
@@ -130,7 +130,8 @@ async function initAdminAuth(pool) {
     // Comprobar si existe el usuario 'admin'
     const [rows] = await conn.query('SELECT id FROM admin_users WHERE username = ?', ['admin']);
     if (rows.length === 0) {
-      const defaultHash = hashPassword('papa123');
+      const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
+      const defaultHash = hashPassword(defaultPassword);
       await conn.query(`
         INSERT INTO admin_users (username, password_hash, full_name, role)
         VALUES (?, ?, ?, ?)

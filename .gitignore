@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.*
+!.env.example
 .ds_store
 *.log
 public/uploads/*

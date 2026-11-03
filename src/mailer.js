@@ -164,7 +164,115 @@ async function sendPhase2InvitationEmail({
   };
 }
 
+/**
+ * Despacha el correo de confirmación de contratación (Asignar a Parada / Contratado Faena)
+ */
+async function sendHiredConfirmationEmail({
+  email,
+  full_name,
+  position_name
+}) {
+  const candidateEmail = email || 'postulante@nexxo.cl';
+  const candidateName = full_name || 'Postulante';
+  const roleName = position_name || 'Especialidad Operativa';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0F1115; color: #F3F4F6; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #14171E; border: 1px solid #262930; border-top: 4px solid #10B981; border-radius: 4px; padding: 30px; }
+    .header { border-bottom: 1px solid #262930; padding-bottom: 15px; margin-bottom: 20px; }
+    .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; padding: 4px 10px; font-family: monospace; font-size: 12px; font-weight: bold; border-radius: 2px; }
+    h1 { font-size: 18px; margin: 15px 0 5px 0; color: #F3F4F6; letter-spacing: 0.05em; text-transform: uppercase; }
+    p { font-size: 14px; line-height: 1.6; color: #9CA3AF; margin: 12px 0; }
+    .highlight { color: #FFB800; font-weight: bold; }
+    .info-box { background: #181C24; border: 1px solid #262930; padding: 18px; margin: 20px 0; border-radius: 4px; }
+    .info-item { font-size: 13px; color: #D1D5DB; margin-bottom: 8px; }
+    .info-label { color: #9CA3AF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .footer { border-top: 1px solid #262930; padding-top: 15px; margin-top: 25px; font-size: 11px; color: #6B7280; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="badge">[ACREDITACIÓN APROBADA // ASIGNADO A PARADA]</span>
+      <h1>Nexxo S.A. — División El Teniente (Codelco)</h1>
+    </div>
+
+    <p>Estimado/a <strong style="color:#F3F4F6;">${candidateName}</strong>,</p>
+    <p>Le informamos que su expediente documental y acreditación técnica para el cargo de <span class="highlight">${roleName}</span> han sido <strong>APROBADOS</strong> por el Departamento de Selección y Recursos Humanos de Nexxo S.A.</p>
+    
+    <div class="info-box">
+      <div class="info-item"><span class="info-label">Estado:</span> <strong style="color: #10B981;">Acreditación Conforme y Confirmada</strong></div>
+      <div class="info-item"><span class="info-label">Faena:</span> Codelco División El Teniente (Rancagua)</div>
+      <div class="info-item"><span class="info-label">Pase de Acceso:</span> Carpeta WebControl en tramitación reglamentaria</div>
+    </div>
+
+    <p>
+      Su incorporación a la dotación operativa de parada de planta se encuentra formalizada. Durante las próximas horas, el equipo de Operaciones de Nexxo S.A. se comunicará con usted vía telefónica o correo para coordinar:
+    </p>
+    <ul style="font-size: 13px; color: #D1D5DB; line-height: 1.8;">
+      <li>Inducción de Seguridad en Faena (Obligación de Informar - ODI).</li>
+      <li>Examen Ocupacional / Batería de Altura Geográfica y ECF.</li>
+      <li>Programación de turno y entrega de Equipo de Protección Personal (EPP).</li>
+    </ul>
+
+    <div class="footer">
+      Nexxo S.A. | División Operaciones & Mantenimiento Minero.<br>
+      Plataforma de Acreditación conforme a Estándares ECF Codelco y Reglamento de Seguridad Minera DS N° 132.
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const transporter = getMailTransporter();
+  if (transporter) {
+    try {
+      const fromAddress = process.env.SMTP_FROM || `"Nexxo S.A. Acreditaciones" <${process.env.SMTP_USER}>`;
+      const mailOptions = {
+        from: fromAddress,
+        to: candidateEmail,
+        subject: `[NEXXO S.A.] Acreditación Aprobada — Convocatoria Parada de Planta El Teniente (${roleName})`,
+        html: htmlContent
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`\n[MAILER/SMTP] Notificación de contratación enviada exitosamente a ${candidateEmail}. ID: ${info.messageId}`);
+      return {
+        success: true,
+        sent: true,
+        simulated: false,
+        messageId: info.messageId,
+        recipient: candidateEmail
+      };
+    } catch (err) {
+      console.error(`\n[MAILER/SMTP ERROR] Error enviando correo de contratación a ${candidateEmail}:`, err.message);
+    }
+  }
+
+  // Fallback a Simulador de Consola
+  console.log('\n' + '='.repeat(82));
+  console.log(' [SIMULADOR DE EMAIL - NOTIFICACIÓN DE CONTRATACIÓN // ASIGNADO A PARADA]');
+  console.log(` Para:   ${candidateEmail} (${candidateName})`);
+  console.log(` Cargo:  ${roleName}`);
+  console.log(` Asunto: [NEXXO S.A.] Acreditación Aprobada — Convocatoria Parada de Planta El Teniente`);
+  console.log(` Estado: Acreditación aprobada y cupo asignado en faena`);
+  console.log('='.repeat(82) + '\n');
+
+  return {
+    success: true,
+    sent: false,
+    simulated: true,
+    recipient: candidateEmail
+  };
+}
+
 module.exports = {
   generateAccessToken,
-  sendPhase2InvitationEmail
+  sendPhase2InvitationEmail,
+  sendHiredConfirmationEmail
 };

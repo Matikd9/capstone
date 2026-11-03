@@ -63,6 +63,63 @@ document.addEventListener('DOMContentLoaded', () => {
   const hintCity = document.getElementById('hint-city');
   const hintExp = document.getElementById('hint-exp');
 
+  const btnUnlockManual = document.getElementById('btn-unlock-manual');
+  const phoneGroup = document.getElementById('phone-group');
+  const ocrAutofillDesc = document.getElementById('ocr-autofill-desc');
+
+  const phase1Inputs = [fullNameInput, rutInput, emailInput, phoneInput, cityInput, expInput].filter(Boolean);
+
+  function lockPhase1Inputs() {
+    phase1Inputs.forEach(input => {
+      input.disabled = true;
+    });
+    if (phoneGroup) phoneGroup.classList.add('is-locked');
+    if (ocrBadgeIndicator) {
+      ocrBadgeIndicator.textContent = 'ESPERANDO DOCUMENTOS';
+      ocrBadgeIndicator.className = 'status-pill status-Pendiente';
+    }
+  }
+
+  function unlockPhase1Inputs(isManual = false, hasDiscrepancy = false) {
+    phase1Inputs.forEach(input => {
+      input.disabled = false;
+    });
+    if (phoneGroup) phoneGroup.classList.remove('is-locked');
+    if (ocrAutofillDesc) {
+      if (isManual) {
+        ocrAutofillDesc.textContent = 'Campos habilitados para ingreso manual. Por favor complete y confirme sus datos personales.';
+      } else if (hasDiscrepancy) {
+        ocrAutofillDesc.textContent = 'Se detectaron discrepancias entre los documentos adjuntos. Verifique y confirme sus datos personales.';
+      } else {
+        ocrAutofillDesc.textContent = 'La información ha sido cargada a partir de sus documentos adjuntos. Por favor verifique y confirme sus datos personales.';
+      }
+    }
+    if (ocrBadgeIndicator) {
+      if (isManual) {
+        ocrBadgeIndicator.textContent = 'INGRESO MANUAL';
+        ocrBadgeIndicator.className = 'status-pill status-Pendiente';
+      } else if (hasDiscrepancy) {
+        ocrBadgeIndicator.textContent = 'DISCREPANCIAS DETECTADAS';
+        ocrBadgeIndicator.className = 'status-pill status-Pendiente';
+      } else {
+        ocrBadgeIndicator.textContent = 'DOCUMENTOS VALIDADOS';
+        ocrBadgeIndicator.className = 'status-pill status-Aprobado';
+      }
+    }
+    if (btnUnlockManual) {
+      btnUnlockManual.style.display = 'none';
+    }
+  }
+
+  if (btnUnlockManual) {
+    btnUnlockManual.addEventListener('click', () => {
+      unlockPhase1Inputs(true);
+    });
+  }
+
+  // Iniciar campos bloqueados hasta que el OCR procese los documentos
+  lockPhase1Inputs();
+
   // Telemetría en Tiempo Real de Datos Parseados (Fase 1)
   const telemetryRut = document.getElementById('telemetry-rut');
   const telemetryCity = document.getElementById('telemetry-city');
@@ -115,11 +172,67 @@ document.addEventListener('DOMContentLoaded', () => {
       .join(' ');
   }
 
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Convierte un archivo a base64, comprimiendo automáticamente fotos de alta resolución
+   * en Canvas para reducir la carga de red y acelerar el OCR de ~20s a ~3s.
+   */
+  async function fileToBase64(file, maxDimension = 1600, quality = 0.85) {
+    if (!file) return null;
+
+    // Si es PDF, DOCX u otro documento no imagen, devolver base64 directo
+    if (!file.type || !file.type.startsWith('image/')) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = err => reject(err);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Para imágenes (fotos de celulares de alta resolución): redimensionar en Canvas
+    return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = err => reject(err);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convertir a JPEG optimizado
+          const optimizedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(optimizedDataUrl);
+        };
+        img.onerror = () => {
+          // Fallback a base64 original si falla el canvas
+          resolve(e.target.result);
+        };
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(null);
       reader.readAsDataURL(file);
     });
   }
@@ -317,9 +430,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 2. Ejecutar OCR en Fase 1 (Credencial Técnica + CV)
+  // 2. Ejecutar lectura y validación de documentos en Fase 1 (Credencial Técnica + CV)
   async function triggerPhase1OCR() {
-    if (!state.credencialBase64 && !state.cvBase64) return;
+    // Si falta alguno de los dos documentos requeridos, guiar al postulante y esperar ambos para 1 solo análisis
+    if (!state.credencialBase64 || !state.cvBase64) {
+      if (state.credencialBase64 || state.cvBase64) {
+        ocrLiveBanner.style.display = 'flex';
+        ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
+        ocrLiveIcon.className = 'ocr-icon-static ocr-icon-info';
+        ocrLiveIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+        const missingDoc = !state.credencialBase64 ? 'su Credencial Técnica' : 'su Currículum Vitae (CV)';
+        ocrLiveText.textContent = `Documentación en proceso (1 de 2). Por favor adjunte ${missingDoc} para continuar con la validación de sus antecedentes.`;
+      } else {
+        ocrLiveBanner.style.display = 'none';
+      }
+      return;
+    }
 
     if (state.isRunningOcr) {
       state.pendingOcrRerun = true;
@@ -330,8 +456,9 @@ document.addEventListener('DOMContentLoaded', () => {
     state.pendingOcrRerun = false;
     ocrLiveBanner.style.display = 'flex';
     ocrLiveBanner.className = 'ocr-banner ocr-banner-loading';
-    ocrLiveIcon.textContent = '●';
-    ocrLiveText.textContent = 'Leyendo y procesando antecedentes en sus documentos...';
+    ocrLiveIcon.className = 'ocr-spinner';
+    ocrLiveIcon.innerHTML = '';
+    ocrLiveText.textContent = 'Validando antecedentes y verificando información en sus documentos adjuntos...';
     ocrFieldsContainer.style.display = 'block';
 
     try {
@@ -350,16 +477,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (data.full_name && !fullNameInput.dataset.edited) {
           fullNameInput.value = formatTitleCase(data.full_name);
-          if (data.rut_source === 'CREDENCIAL') {
+          if (data.name_discrepancia) {
+            hintName.textContent = 'Atención: El nombre en su CV difiere de su Credencial. Se priorizó la Credencial oficial.';
+            hintName.style.color = 'var(--safety-yellow)';
+          } else if (data.name_source === 'CREDENCIAL') {
             hintName.textContent = 'Nombre oficial obtenido desde Licencia / Credencial Técnica';
+            hintName.style.color = 'var(--status-normal-text)';
+          } else if (data.name_source === 'AMBOS_COINCIDENTES') {
+            hintName.textContent = 'Nombre validado y coincidente en CV y Credencial Técnica';
+            hintName.style.color = 'var(--status-normal-text)';
           } else {
-            hintName.textContent = 'Nombre detectado automáticamente en su CV';
+            hintName.textContent = 'Nombre obtenido desde Currículum Vitae';
+            hintName.style.color = 'var(--status-normal-text)';
           }
-          hintName.style.color = 'var(--status-normal-text)';
         }
 
         if (data.rut_id && !rutInput.dataset.edited) {
-          rutInput.value = data.rut_id;
+          rutInput.value = formatRut(data.rut_id);
           if (data.rut_discrepancia) {
             hintRut.textContent = `Atención: El RUT en su CV difiere de su Credencial. Se priorizó la Credencial oficial.`;
             hintRut.style.color = 'var(--safety-yellow)';
@@ -377,12 +511,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (data.email && !emailInput.dataset.edited) {
           emailInput.value = data.email;
-          hintEmail.textContent = 'Correo detectado automáticamente en CV';
+          hintEmail.textContent = 'Correo detectado en CV';
           hintEmail.style.color = 'var(--status-normal-text)';
         }
         if (data.phone && !phoneInput.dataset.edited) {
-          phoneInput.value = data.phone;
-          hintPhone.textContent = 'Teléfono detectado automáticamente en CV';
+          phoneInput.value = formatChileanPhoneDigits(data.phone);
+          hintPhone.textContent = 'Teléfono detectado en CV';
           hintPhone.style.color = 'var(--status-normal-text)';
         }
         if (cityInput && !cityInput.dataset.edited) {
@@ -416,24 +550,38 @@ document.addEventListener('DOMContentLoaded', () => {
         if (telemetryExp) telemetryExp.textContent = `${data.experience_years || 0} años`;
         if (telemetryCred) telemetryCred.textContent = data.credencial_status || 'VERIFICADA';
 
-        if (data.rut_discrepancia) {
+        const hasDiscrepancy = Boolean(data.rut_discrepancia || data.name_discrepancia);
+        if (hasDiscrepancy) {
           ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
-          ocrLiveIcon.textContent = '⚠️';
-          ocrLiveText.textContent = `Aviso: El RUT en su CV (${data.rut_cv}) difiere de su Credencial (${data.rut_credencial}). Se priorizó la Credencial Oficial. Por favor verifique sus datos.`;
+          ocrLiveIcon.className = 'ocr-icon-static ocr-icon-warn';
+          ocrLiveIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+          if (data.rut_discrepancia && data.name_discrepancia) {
+            ocrLiveText.textContent = `Observación: El RUT y el Nombre en su CV difieren de su Credencial oficial. Se priorizó la Credencial oficial. Por favor revise y confirme sus datos.`;
+          } else if (data.rut_discrepancia) {
+            ocrLiveText.textContent = `Observación: El RUT en su CV (${data.rut_cv || 'No detectado'}) difiere de su Credencial (${data.rut_credencial || 'No detectado'}). Se consideró la Credencial oficial. Por favor confirme sus datos.`;
+          } else {
+            ocrLiveText.textContent = `Observación: El nombre en su CV (${data.name_cv || 'No detectado'}) difiere de su Credencial (${data.name_credencial || 'No detectado'}). Se consideró la Credencial oficial. Por favor confirme sus datos.`;
+          }
         } else {
           ocrLiveBanner.className = 'ocr-banner ocr-banner-done';
-          ocrLiveIcon.textContent = '✓';
-          ocrLiveText.textContent = `Documentos procesados exitosamente. Hemos autocompletado sus datos; por favor verifique o edite cualquier campo antes de continuar.`;
+          ocrLiveIcon.className = 'ocr-icon-static ocr-icon-done';
+          ocrLiveIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+          ocrLiveText.textContent = `Documentos validados. La información ha sido cargada en el formulario; por favor revise y confirme sus datos antes de continuar.`;
         }
+        unlockPhase1Inputs(false, hasDiscrepancy);
       } else {
         ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
-        ocrLiveIcon.textContent = 'ℹ️';
-        ocrLiveText.textContent = 'Por favor verifique y complete sus datos personales en el formulario inferior.';
+        ocrLiveIcon.className = 'ocr-icon-static ocr-icon-info';
+        ocrLiveIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+        ocrLiveText.textContent = 'Por favor complete y confirme sus datos personales en el formulario a continuación.';
+        unlockPhase1Inputs(true);
       }
     } catch (e) {
       ocrLiveBanner.className = 'ocr-banner ocr-banner-warn';
-      ocrLiveIcon.textContent = 'ℹ️';
-      ocrLiveText.textContent = 'Puede completar o revisar sus datos personales directamente en el formulario.';
+      ocrLiveIcon.className = 'ocr-icon-static ocr-icon-info';
+      ocrLiveIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      ocrLiveText.textContent = 'Por favor complete y confirme sus datos personales directamente en el formulario.';
+      unlockPhase1Inputs(true);
     } finally {
       state.isRunningOcr = false;
       if (state.pendingOcrRerun) {
@@ -455,8 +603,9 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     onFileCleared: () => {
       state.credencialBase64 = null;
-      credencialStatus.textContent = '[ESCANEO ACTIVO: Carnet Rigger, WPQ o Licencia D]';
+      credencialStatus.textContent = 'Requisito: Carnet Rigger, WPQ o Licencia D según especialidad';
       credencialStatus.style.color = '';
+      triggerPhase1OCR();
     }
   });
 
@@ -472,8 +621,9 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     onFileCleared: () => {
       state.cvBase64 = null;
-      cvStatus.textContent = '[ESCANEO ACTIVO: CV en PDF, DOCX o Imagen (Contacto y Fechas)]';
+      cvStatus.textContent = 'Requisito: CV detallando fechas, faenas y experiencia en terreno';
       cvStatus.style.color = '';
+      triggerPhase1OCR();
     }
   });
 
@@ -506,6 +656,69 @@ document.addEventListener('DOMContentLoaded', () => {
   bindManualEdit(phoneInput, hintPhone, 'Teléfono');
   bindManualEdit(cityInput, hintCity, 'Ciudad');
   bindManualEdit(expInput, hintExp, 'Experiencia');
+
+  /**
+   * Formatea un RUT chileno dinámicamente con puntos y guion: XX.XXX.XXX-X
+   * Solo acepta dígitos numéricos y letra K/k al final.
+   */
+  function formatRut(val) {
+    if (!val) return '';
+    let clean = val.replace(/[^0-9kK]/g, '');
+    if (clean.length === 0) return '';
+    if (clean.length > 9) clean = clean.slice(0, 9);
+    if (clean.length === 1) return clean;
+
+    const dv = clean.slice(-1).toUpperCase();
+    let body = clean.slice(0, -1);
+    let formattedBody = '';
+    while (body.length > 3) {
+      formattedBody = '.' + body.slice(-3) + formattedBody;
+      body = body.slice(0, -3);
+    }
+    formattedBody = body + formattedBody;
+    return `${formattedBody}-${dv}`;
+  }
+
+  /**
+   * Extrae y formatea solo los 8 dígitos móviles para el input (el prefijo '+56 9' es un addon visual estático).
+   * Agrupa los 8 dígitos como XXXX XXXX (ej. 9796 2837 o 8765 4321).
+   */
+  function formatChileanPhoneDigits(val) {
+    if (!val) return '';
+    let digits = String(val).replace(/\D/g, '');
+    if (!digits) return '';
+
+    // Si viene con el código país 56
+    if (digits.startsWith('56')) {
+      digits = digits.slice(2);
+    }
+    // Si viene con el 9 móvil al inicio y tiene 9 dígitos (ej. 997962837 o 987654321)
+    if (digits.length >= 9 && digits.startsWith('9')) {
+      digits = digits.slice(1);
+    }
+
+    // Tomar únicamente hasta 8 dígitos móviles
+    digits = digits.slice(0, 8);
+    if (digits.length <= 4) return digits;
+    return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+  }
+
+  if (rutInput) {
+    rutInput.addEventListener('input', () => {
+      const prev = rutInput.value;
+      const formatted = formatRut(prev);
+      rutInput.value = formatted;
+      if (telemetryRut) {
+        telemetryRut.textContent = formatted || 'NO DETECTADO';
+      }
+    });
+  }
+
+  if (phoneInput) {
+    phoneInput.addEventListener('input', () => {
+      phoneInput.value = formatChileanPhoneDigits(phoneInput.value);
+    });
+  }
 
   if (fullNameInput) {
     fullNameInput.addEventListener('blur', () => {
@@ -560,6 +773,13 @@ document.addEventListener('DOMContentLoaded', () => {
         n.classList.remove('active', 'completed');
       }
     });
+
+    // Ocultar tarjeta de requisitos iniciales de Fase 1 al entrar a Fase 2 o dictamen final
+    const asideCardPhase1 = document.getElementById('aside-card-phase1-docs');
+    if (asideCardPhase1) {
+      asideCardPhase1.style.display = (stepNum >= 3) ? 'none' : 'block';
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -590,11 +810,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const formattedName = formatTitleCase(fullNameInput.value);
     fullNameInput.value = formattedName;
 
+    const rawPhoneDigits = phoneInput.value.replace(/\D/g, '');
+    let fullPhone = '';
+    if (rawPhoneDigits.length > 0) {
+      const p8 = rawPhoneDigits.slice(-8);
+      fullPhone = p8.length <= 4 ? `+56 9 ${p8}` : `+56 9 ${p8.slice(0, 4)} ${p8.slice(4)}`;
+    }
+
     state.candidateData = {
       full_name: formattedName,
       rut_id: rutInput.value.trim(),
       email: emailInput.value.trim(),
-      phone: phoneInput.value.trim(),
+      phone: fullPhone,
       city: cityInput.value.trim(),
       experience_years: parseInt(expInput.value || '0', 10),
       position_id: parseInt(positionSelect.value, 10)
@@ -960,6 +1187,78 @@ document.addEventListener('DOMContentLoaded', () => {
       state.candidateId = data.id;
       state.candidateData = data;
 
+      // Control de Reingreso: Si el postulante ya envió sus antecedentes previamente, no mostrar formulario vacío
+      const isAlreadySubmitted = Boolean(
+        data.phase2_submitted_at || 
+        data.token_used_at || 
+        data.carnet_file || 
+        ['PRE_ACREDITADO', 'EN_REVISION_MANUAL', 'CONTRATADO_FAENA', 'DESCARTADO_TECNICO'].includes(data.status)
+      );
+
+      if (isAlreadySubmitted) {
+        goToStep(4);
+
+        if (data.status === 'CONTRATADO_FAENA') {
+          finalIcon.textContent = 'ESTADO: CONTRATADO FAENA';
+          finalIcon.className = 'status-pill status-Aprobado';
+          finalTitle.textContent = 'Acreditación Aprobada — Contratado para Faena';
+          finalSubtitle.textContent = 'Su documentación fue aprobada y cuenta con asignación oficial a la parada de planta en Codelco División El Teniente. El equipo de Operaciones se contactará para coordinar inducción y exámenes.';
+        } else if (data.status === 'PRE_ACREDITADO') {
+          finalIcon.textContent = 'ESTADO: PRE-ACREDITADO';
+          finalIcon.className = 'status-pill status-Aprobado';
+          finalTitle.textContent = 'Documentación Pre-Acreditada para División El Teniente';
+          finalSubtitle.textContent = 'Su documentación ha sido verificada exitosamente. Su carpeta de acreditación está a la espera de la asignación final de cupo por parte de RR.HH.';
+        } else if (data.status === 'EN_REVISION_MANUAL') {
+          finalIcon.textContent = 'ESTADO: EN REVISIÓN';
+          finalIcon.className = 'status-pill status-Pendiente';
+          finalTitle.textContent = 'Documentación Recibida — En Revisión por RR.HH.';
+          finalSubtitle.textContent = 'Sus documentos fueron recibidos correctamente. El equipo de Selección está auditando su expediente normativo.';
+        } else if (data.status === 'DESCARTADO_TECNICO') {
+          finalIcon.textContent = 'ESTADO: PROCESO FINALIZADO';
+          finalIcon.className = 'status-pill status-Descartado';
+          finalTitle.textContent = 'Postulación Concluida';
+          finalSubtitle.textContent = 'El proceso de selección para esta convocatoria ha concluido. Sus antecedentes han quedado archivados para futuros llamados operativos.';
+        } else {
+          finalIcon.textContent = 'ESTADO: EN PROCESO';
+          finalIcon.className = 'status-pill status-Pendiente';
+          finalTitle.textContent = 'Documentación Ingresada';
+          finalSubtitle.textContent = 'Sus antecedentes han sido ingresados y se encuentran en proceso de tramitación.';
+        }
+
+        const isPreAcreditado = data.status === 'PRE_ACREDITADO' || data.status === 'CONTRATADO_FAENA';
+        resultSummary.innerHTML = `
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">Folio de Postulación</span>
+              <span class="value">#${data.id}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Vigencia Cédula</span>
+              <span class="value">${data.ocr_carnet_vigencia || 'Vigente'}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Certificado de Antecedentes</span>
+              <span class="value">${data.ocr_antecedentes_status || 'Recibido'}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Estado de la Solicitud</span>
+              <span class="status-pill ${isPreAcreditado ? 'status-Aprobado' : 'status-Pendiente'}">${data.status.replace(/_/g, ' ')}</span>
+            </div>
+          </div>
+          ${data.discrepancy_notes && data.status === 'EN_REVISION_MANUAL' ? `
+            <div style="margin-top: 1.25rem; text-align: left; background: var(--status-warning-bg); border: 1px solid var(--status-warning-border); color: var(--status-warning-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.88rem;">
+              <strong>Observación para mesa de selección Nexxo:</strong><br>
+              ${escapeHtml(data.discrepancy_notes)}
+            </div>
+          ` : `
+            <div style="margin-top: 1.25rem; text-align: left; background: var(--status-normal-bg); border: 1px solid var(--status-normal-border); color: var(--status-normal-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.88rem;">
+              <strong>Expediente Registrado:</strong> Su información y antecedentes personales se encuentran debidamente resguardados bajo la Ley N° 19.628 para fines de acreditación minera.
+            </div>
+          `}
+        `;
+        return;
+      }
+
       // Actualizar encabezado de Fase 2
       phase1ScoreBadge.innerHTML = `
         Postulante: <strong>${data.full_name}</strong> | 
@@ -983,6 +1282,34 @@ document.addEventListener('DOMContentLoaded', () => {
       const formPhase2El = document.getElementById('form-phase2');
       if (formPhase2El && formPhase2El.parentNode) {
         formPhase2El.parentNode.insertBefore(bannerContainer, formPhase2El);
+      }
+
+      // Medida de Seguridad: Si quien abre el enlace es un Administrador con sesión activa
+      const isAdminSession = Boolean(sessionStorage.getItem('nexxo_admin_token'));
+      if (isAdminSession) {
+        const adminWarningBanner = document.createElement('div');
+        adminWarningBanner.className = 'ocr-banner ocr-banner-warning';
+        adminWarningBanner.style.marginBottom = '1.25rem';
+        adminWarningBanner.innerHTML = `
+          <strong style="font-family: 'IBM Plex Mono', monospace;">[MODO SUPERVISIÓN ADMINISTRATIVA]</strong>
+          <span>Ha ingresado con una sesión activa de Administrador. Por trazabilidad legal y transparencia (Ley N° 19.628), un evaluador no puede cargar antecedentes en nombre del postulante. La carga de archivos ha sido inhabilitada.</span>
+        `;
+        if (formPhase2El && formPhase2El.parentNode) {
+          formPhase2El.parentNode.insertBefore(adminWarningBanner, formPhase2El);
+        }
+
+        // Inhabilitar controles de carga y botón de envío
+        const btnSubmitPhase2 = document.getElementById('btn-submit-phase2');
+        if (btnSubmitPhase2) {
+          btnSubmitPhase2.disabled = true;
+          btnSubmitPhase2.textContent = '[CARGA INHABILITADA PARA ADMINISTRADORES]';
+          btnSubmitPhase2.style.opacity = '0.6';
+          btnSubmitPhase2.style.cursor = 'not-allowed';
+        }
+        const fileInputs = formPhase2El ? formPhase2El.querySelectorAll('input[type="file"]') : [];
+        fileInputs.forEach(fi => fi.disabled = true);
+        const consentCheckbox = document.getElementById('consent-ley19628');
+        if (consentCheckbox) consentCheckbox.disabled = true;
       }
     } catch (e) {
       console.error('[Error verificando token de acceso]:', e);

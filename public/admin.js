@@ -549,9 +549,10 @@ document.addEventListener("DOMContentLoaded", () => {
             <summary style="cursor: pointer; font-weight: 700; font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between;">
               <span>[VER LOG DE TEXTO EXTRAÍDO POR OCR]</span>
               ${
-                candidate.ocr_text.includes("[MOTOR: GEMINI")
-                  ? '<span class="badge" style="background: rgba(16,185,129,0.15); color: var(--ecf-emerald); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--ecf-emerald);">MOTOR: GEMINI FLASH</span>'
-                  : '<span class="badge" style="background: rgba(255,184,0,0.15); color: var(--safety-yellow); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--safety-yellow);">MOTOR: LOCAL TESSERACT</span>'
+                candidate.ocr_text.includes("[MOTOR: GEMINI") ||
+                candidate.ocr_text.includes("[MOTOR: IA")
+                  ? '<span class="badge" style="background: rgba(16,185,129,0.15); color: var(--ecf-emerald); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--ecf-emerald);">MOTOR: IA GEMINI FLASH</span>'
+                  : '<span class="badge" style="background: rgba(255,184,0,0.15); color: var(--safety-yellow); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--safety-yellow);">MOTOR: LOCAL TESSERACT (FALLBACK)</span>'
               }
             </summary>
             <pre style="white-space: pre-wrap; font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; margin-top: 0.5rem; max-height: 150px; overflow-y: auto; color: var(--text-primary);">${escapeHtml(candidate.ocr_text)}</pre>

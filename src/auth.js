@@ -5,7 +5,11 @@
 
 const crypto = require("crypto");
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-jwt-secret-nexxo-2026";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === "production"
+    ? "super_secret_jwt_key_here"
+    : "dev-jwt-secret-nexxo-2026");
 const TOKEN_EXPIRY_SECONDS = 8 * 60 * 60; // 8 horas (Jornada laboral completa)
 
 /**

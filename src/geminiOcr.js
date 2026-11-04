@@ -4,7 +4,17 @@
  * Extrae datos estructurados (JSON) directamente sin depender de Tesseract local.
  */
 
+const fs = require("fs");
+const path = require("path");
 require("dotenv").config({ override: true });
+if (
+  !process.env.GEMINI_API_KEY &&
+  fs.existsSync(path.join(__dirname, "../.env.production"))
+) {
+  require("dotenv").config({
+    path: path.join(__dirname, "../.env.production"),
+  });
+}
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const mammoth = require("mammoth");
 

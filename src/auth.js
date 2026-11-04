@@ -151,7 +151,7 @@ async function initAdminAuth(pool) {
       ["admin"],
     );
     if (rows.length === 0) {
-      const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || "admin123";
+      const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || "papa123";
       const defaultHash = hashPassword(defaultPassword);
       await conn.query(
         `

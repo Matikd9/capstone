@@ -6,6 +6,14 @@ const { execFileSync } = require("child_process");
 const { createWorker } = require("tesseract.js");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
+if (
+  !process.env.DB_HOST &&
+  fs.existsSync(path.join(__dirname, "../.env.production"))
+) {
+  require("dotenv").config({
+    path: path.join(__dirname, "../.env.production"),
+  });
+}
 
 const geminiOcr = require("./geminiOcr");
 const mailer = require("./mailer");
@@ -28,6 +36,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 
 // Configurar directorio de subidas privado (fuera del directorio estático público)
@@ -3655,6 +3664,13 @@ app.post("/api/auth/admin-login", async (req, res) => {
       return res
         .status(400)
         .json({ error: "Debe ingresar usuario y contraseña." });
+    }
+
+    if (!pool) {
+      return res.status(503).json({
+        error:
+          "El servicio de base de datos se está inicializando. Por favor intente en unos segundos.",
+      });
     }
 
     const [rows] = await pool.query(

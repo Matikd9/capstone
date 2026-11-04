@@ -5,7 +5,7 @@
  */
 
 require("dotenv").config({ override: true });
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const mammoth = require("mammoth");
 
 function isGeminiAvailable() {
@@ -40,10 +40,10 @@ async function callGeminiGenerateContent(parts, systemInstruction = null) {
 
   // Lista de modelos optimizados por baja latencia, cuota y velocidad
   const modelsToTry = [
-    process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
-    "gemini-3.6-flash",
+    process.env.GEMINI_MODEL || "gemini-3.8-flash",
     "gemini-3.5-flash",
-    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
   ].filter((v, i, a) => a.indexOf(v) === i);
 
   const errors = [];
@@ -74,7 +74,7 @@ async function callGeminiGenerateContent(parts, systemInstruction = null) {
     const controller = new AbortController();
     const timeoutTimer = setTimeout(() => {
       controller.abort();
-    }, 15000); // 15 segundos máximo por intento
+    }, 25000); // 25 segundos máximo por intento para documentos extensos
 
     const startTime = Date.now();
 
@@ -92,7 +92,10 @@ async function callGeminiGenerateContent(parts, systemInstruction = null) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        const msg = `Modelo ${currentModel} respondió HTTP ${response.status}: ${errorText.slice(0, 140)}`;
+        const msg =
+          response.status === 402
+            ? `Modelo ${currentModel} respondió HTTP 402 (Créditos/Cuota prepago agotada en AI Studio)`
+            : `Modelo ${currentModel} respondió HTTP ${response.status}: ${errorText.slice(0, 140)}`;
         errors.push(msg);
         console.warn(
           `[Gemini Cascada Aviso] ${msg}. Conmutando al siguiente modelo de respaldo...`,

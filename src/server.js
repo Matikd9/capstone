@@ -259,6 +259,10 @@ async function initDB(retries = 10, delay = 3000) {
           "ALTER TABLE candidates MODIFY COLUMN age INT DEFAULT 30",
         );
       } catch (e) {}
+      // TiDB Cloud Serverless: Configurar AUTO_ID_CACHE bajo para evitar saltos de 30.000 en folios
+      try {
+        await conn.query("ALTER TABLE candidates AUTO_ID_CACHE = 10");
+      } catch (e) {}
 
       // Migraciones en questions para categoría SJT / TECNICA y posición opcional
       try {

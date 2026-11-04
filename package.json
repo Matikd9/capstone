@@ -5,7 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "format": "prettier --write \"src/**/*.js\" \"public/**/*.js\" \"public/**/*.css\"",
+    "lint": "prettier --check \"src/**/*.js\" \"public/**/*.js\" \"public/**/*.css\""
   },
   "keywords": [
     "devcontainer",
@@ -20,12 +22,14 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.7.3",
     "mammoth": "^1.13.0",
     "mysql2": "^3.9.7",
     "nodemailer": "^6.9.16",
     "tesseract.js": "^5.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "prettier": "^3.9.10"
   }
 }

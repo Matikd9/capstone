@@ -6,3 +6,6 @@ node_modules/
 *.log
 public/uploads/*
 Attachments/*
+
+storage/uploads/*
+!storage/uploads/.gitkeep

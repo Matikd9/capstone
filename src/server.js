@@ -2537,15 +2537,13 @@ app.get(["/api/files/:filename", "/uploads/:filename"], async (req, res) => {
       });
     }
 
-    // 5. Cabeceras de seguridad estrictas
+    // 5. Cabeceras de seguridad y despacho según tipo de archivo
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader(
-      "Content-Security-Policy",
-      "default-src 'none'; style-src 'unsafe-inline'; sandbox",
-    );
-    res.setHeader("Content-Disposition", "inline");
 
     const ext = path.extname(filename).toLowerCase();
+    const isDownload =
+      req.query.download === "1" || req.query.download === "true";
+
     const mimeTypes = {
       ".pdf": "application/pdf",
       ".jpg": "image/jpeg",
@@ -2556,6 +2554,85 @@ app.get(["/api/files/:filename", "/uploads/:filename"], async (req, res) => {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ".doc": "application/msword",
     };
+
+    // Si se solicita descarga explícita mediante ?download=1
+    if (isDownload) {
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${encodeURIComponent(filename)}"`,
+      );
+      res.setHeader(
+        "Content-Type",
+        fileMime || mimeTypes[ext] || "application/octet-stream",
+      );
+      return res.send(fileBuffer);
+    }
+
+    // Para archivos Word (.docx/.doc), los navegadores web no pueden renderizarlos dentro de un iframe.
+    // Los convertimos en HTML seguro mediante mammoth para visualizarlos de forma inmediata y aislada.
+    if (ext === ".docx" || ext === ".doc") {
+      try {
+        const conversion = await mammoth.convertToHtml({ buffer: fileBuffer });
+        const docHtml =
+          conversion.value ||
+          "<p><em>(Documento sin contenido de texto legible)</em></p>";
+        const renderedPage = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(filename)}</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      background: #f8fafc;
+      padding: 1.5rem 1rem;
+      margin: 0;
+    }
+    .doc-container {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 2.5rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      border: 1px solid #e2e8f0;
+      word-break: break-word;
+    }
+    h1, h2, h3, h4 { color: #0f172a; margin-top: 1.25em; margin-bottom: 0.5em; }
+    p { margin: 0.6em 0; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; font-size: 0.9rem; }
+    th { background: #f1f5f9; font-weight: 600; }
+    ul, ol { padding-left: 1.5rem; }
+    hr { border: 0; border-top: 1px solid #e2e8f0; margin: 1.5rem 0; }
+  </style>
+</head>
+<body>
+  <div class="doc-container">
+    ${docHtml}
+  </div>
+</body>
+</html>`;
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Content-Disposition", "inline");
+        res.setHeader(
+          "Content-Security-Policy",
+          "default-src 'none'; style-src 'unsafe-inline';",
+        );
+        return res.send(renderedPage);
+      } catch (convErr) {
+        console.warn(
+          `[File Server] No se pudo convertir docx a HTML (${filename}):`,
+          convErr.message,
+        );
+      }
+    }
+
+    // Cabeceras de seguridad para PDFs e Imágenes
+    res.setHeader("Content-Disposition", "inline");
     if (fileMime || mimeTypes[ext]) {
       res.setHeader("Content-Type", fileMime || mimeTypes[ext]);
     }

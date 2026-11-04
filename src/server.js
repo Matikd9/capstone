@@ -103,15 +103,24 @@ app.get("/admin.html", (req, res) => {
 });
 
 // Configuración DB MySQL / TiDB (Compatible con desarrollo local TCP, TiDB Cloud TLS y sockets Unix Cloud SQL)
-const isCloudSqlSocket =
-  process.env.DB_HOST && process.env.DB_HOST.startsWith("/cloudsql/");
+const isProduction = process.env.NODE_ENV === "production";
+const defaultHost = isProduction
+  ? "gateway01.sa-east-1.prod.aws.tidbcloud.com"
+  : "db";
+const defaultPort = isProduction ? 4000 : 3306;
+const defaultUser = isProduction ? "2dxMvg3DeE2f8m2.root" : "root";
+const defaultPassword = isProduction ? "yl5mQlqC8ezFqkYK" : "rootpassword";
+
+const host = process.env.DB_HOST || defaultHost;
+const isCloudSqlSocket = host && host.startsWith("/cloudsql/");
 const requiresSsl =
   process.env.DB_SSL === "true" ||
-  (process.env.DB_HOST && process.env.DB_HOST.includes("tidbcloud.com"));
+  host.includes("tidbcloud.com") ||
+  (isProduction && !isCloudSqlSocket);
 
 const dbConfig = {
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "rootpassword",
+  user: process.env.DB_USER || defaultUser,
+  password: process.env.DB_PASSWORD || defaultPassword,
   database: process.env.DB_NAME || "web_app",
   waitForConnections: true,
   connectionLimit: 10,
@@ -120,10 +129,10 @@ const dbConfig = {
     ? { ssl: { minVersion: "TLSv1.2", rejectUnauthorized: true } }
     : {}),
   ...(isCloudSqlSocket
-    ? { socketPath: process.env.DB_HOST }
+    ? { socketPath: host }
     : {
-        host: process.env.DB_HOST || "db",
-        port: parseInt(process.env.DB_PORT || "3306", 10),
+        host: host,
+        port: parseInt(process.env.DB_PORT || String(defaultPort), 10),
       }),
 };
 

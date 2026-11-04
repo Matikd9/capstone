@@ -260,10 +260,18 @@
                     <div class="field-group">
                       <label for="phone">Teléfono de Contacto *</label>
                       <div class="phone-input-group" id="phone-group">
-                        <span class="phone-prefix-addon" aria-hidden="true">+56 9</span>
-                        <input type="tel" id="phone" class="phone-input-control" placeholder="8765 4321" maxlength="9" required autocomplete="tel-national" disabled>
+                        <select id="phone-prefix" class="phone-prefix-select" aria-label="Prefijo telefónico" disabled>
+                          <option value="+56" selected>🇨🇱 Chile (+56)</option>
+                          <option value="+51">🇵🇪 Perú (+51)</option>
+                          <option value="+58">🇻🇪 Venezuela (+58)</option>
+                          <option value="+57">🇨🇴 Colombia (+57)</option>
+                          <option value="+54">🇦🇷 Argentina (+54)</option>
+                          <option value="+591">🇧🇴 Bolivia (+591)</option>
+                          <option value="other">🌐 Otro prefijo (+...)</option>
+                        </select>
+                        <input type="tel" id="phone" class="phone-input-control" placeholder="9 8765 4321" maxlength="15" required autocomplete="tel" disabled>
                       </div>
-                      <span class="field-hint" id="hint-phone">Ingrese los 8 dígitos de su celular (ej. 9796 2837)</span>
+                      <span class="field-hint" id="hint-phone">Número chileno (ej. 9 8765 4321 o 72 212 3456) o internacional</span>
                     </div>
 
                     <div class="field-group">

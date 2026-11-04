@@ -10,8 +10,8 @@ RUN npm ci --only=production
 # Copiar el código fuente y activos estáticos
 COPY . .
 
-# Crear el directorio de uploads en caso de no existir
-RUN mkdir -p public/uploads
+# Crear los directorios de uploads en caso de no existir
+RUN mkdir -p storage/uploads public/uploads
 
 # Puerto e inicio para Google Cloud Run
 ENV PORT=8080

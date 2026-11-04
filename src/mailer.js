@@ -21,8 +21,12 @@ function generateAccessToken(validDays = 7) {
  * Retorna el transporte SMTP configurado o null si no hay credenciales
  */
 function getMailTransporter() {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const isProduction = process.env.NODE_ENV === "production";
+  const defaultUser = isProduction ? "matiasmedina278@gmail.com" : null;
+  const defaultPass = isProduction ? "ebqo gdin oaaf idda" : null;
+
+  const user = process.env.SMTP_USER || defaultUser;
+  const pass = process.env.SMTP_PASS || defaultPass;
 
   if (!user || !pass || user.trim() === "" || pass.trim() === "") {
     return null;
@@ -119,9 +123,13 @@ async function sendPhase2InvitationEmail({
   const transporter = getMailTransporter();
   if (transporter) {
     try {
+      const senderUser =
+        process.env.SMTP_USER ||
+        (process.env.NODE_ENV === "production"
+          ? "matiasmedina278@gmail.com"
+          : "");
       const fromAddress =
-        process.env.SMTP_FROM ||
-        `"Nexxo S.A. Acreditaciones" <${process.env.SMTP_USER}>`;
+        process.env.SMTP_FROM || `"Nexxo S.A. Acreditaciones" <${senderUser}>`;
       const mailOptions = {
         from: fromAddress,
         to: candidateEmail,
@@ -242,9 +250,13 @@ async function sendHiredConfirmationEmail({ email, full_name, position_name }) {
   const transporter = getMailTransporter();
   if (transporter) {
     try {
+      const senderUser =
+        process.env.SMTP_USER ||
+        (process.env.NODE_ENV === "production"
+          ? "matiasmedina278@gmail.com"
+          : "");
       const fromAddress =
-        process.env.SMTP_FROM ||
-        `"Nexxo S.A. Acreditaciones" <${process.env.SMTP_USER}>`;
+        process.env.SMTP_FROM || `"Nexxo S.A. Acreditaciones" <${senderUser}>`;
       const mailOptions = {
         from: fromAddress,
         to: candidateEmail,

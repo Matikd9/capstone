@@ -770,11 +770,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window.openSecureDocViewer = function (url, title = "Documento") {
     if (!url) return;
-    const authUrl = `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(adminToken)}`;
+    const separator = url.includes("?") ? "&" : "?";
+    const authUrl = `${url}${separator}token=${encodeURIComponent(adminToken)}`;
+    const downloadUrl = `${url}${separator}token=${encodeURIComponent(adminToken)}&download=1`;
     if (docModalTitle) docModalTitle.textContent = title;
     if (docViewerFrame) docViewerFrame.src = authUrl;
     if (docModalDownload) {
-      docModalDownload.href = authUrl;
+      docModalDownload.href = downloadUrl;
       docModalDownload.setAttribute("download", "");
     }
     if (modalDocViewer) modalDocViewer.style.display = "flex";

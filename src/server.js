@@ -233,6 +233,8 @@ async function initDB(retries = 10, delay = 3000) {
           antecedentes_file VARCHAR(255),
           initial_selfie VARCHAR(255),
           random_selfie VARCHAR(255),
+          facial_match_ok TINYINT(1) DEFAULT NULL,
+          facial_confidence INT DEFAULT NULL,
           score INT DEFAULT 0,
           total_questions INT DEFAULT 0,
           audio_file VARCHAR(255),
@@ -345,6 +347,29 @@ async function initDB(retries = 10, delay = 3000) {
         try {
           await conn.query(sql);
         } catch (e) {}
+      }
+
+      try {
+        await conn.query(
+          "ALTER TABLE candidates ADD COLUMN IF NOT EXISTS facial_match_ok TINYINT(1) DEFAULT NULL;",
+        );
+      } catch (e) {
+        try {
+          await conn.query(
+            "ALTER TABLE candidates ADD COLUMN facial_match_ok TINYINT(1) DEFAULT NULL;",
+          );
+        } catch (e2) {}
+      }
+      try {
+        await conn.query(
+          "ALTER TABLE candidates ADD COLUMN IF NOT EXISTS facial_confidence INT DEFAULT NULL;",
+        );
+      } catch (e) {
+        try {
+          await conn.query(
+            "ALTER TABLE candidates ADD COLUMN facial_confidence INT DEFAULT NULL;",
+          );
+        } catch (e2) {}
       }
 
       // Asegurar índice único en access_token de forma idempotente
@@ -2970,221 +2995,237 @@ app.post("/api/ocr/extract", async (req, res) => {
 });
 
 // 4. FASE 1 + FASE 1.5: Evaluar Filtro Curricular + Mini-Test Técnico (Nota >= 80%) + Selfie Transparente
-app.post("/api/candidates/phase1-submit", async (req, res) => {
-  try {
-    const {
-      full_name,
-      rut_id,
-      email,
-      phone,
-      city,
-      experience_years,
-      position_id,
-      cv_file,
-      credencial_file,
-      initial_selfie,
-      consent_proctoring,
-      answers,
-      phase1_ocr_data,
-    } = req.body;
+app.post(
+  ["/api/candidates", "/api/candidates/phase1-submit"],
+  async (req, res) => {
+    try {
+      const {
+        full_name,
+        rut_id,
+        email,
+        phone,
+        city,
+        experience_years,
+        position_id,
+        cv_file,
+        credencial_file,
+        initial_selfie,
+        random_selfie,
+        consent_proctoring,
+        answers,
+        phase1_ocr_data,
+      } = req.body;
 
-    let formattedName = formatTitleCase(full_name);
-    if (
-      !isValidPersonName(formattedName) &&
-      phase1_ocr_data &&
-      isValidPersonName(phase1_ocr_data.full_name)
-    ) {
-      formattedName = formatTitleCase(phase1_ocr_data.full_name);
-    }
-    const formattedRut = formatRut(rut_id) || (rut_id || "").trim();
-    const expYears = parseInt(experience_years || "0", 10);
+      let formattedName = formatTitleCase(full_name);
+      if (
+        !isValidPersonName(formattedName) &&
+        phase1_ocr_data &&
+        isValidPersonName(phase1_ocr_data.full_name)
+      ) {
+        formattedName = formatTitleCase(phase1_ocr_data.full_name);
+      }
+      const formattedRut = formatRut(rut_id) || (rut_id || "").trim();
+      const expYears = parseInt(experience_years || "0", 10);
 
-    if (!formattedName || !formattedRut || !position_id) {
-      return res.status(400).json({
-        error: "Faltan datos obligatorios de identificación o cargo.",
-      });
-    }
+      if (!formattedName || !formattedRut || !position_id) {
+        return res.status(400).json({
+          error: "Faltan datos obligatorios de identificación o cargo.",
+        });
+      }
 
-    // Obtener requisitos ECF del cargo
-    const [posRows] = await pool.query("SELECT * FROM positions WHERE id = ?", [
-      position_id,
-    ]);
-    const position = posRows[0] || {
-      min_experience_years: 2,
-      name: "Cargo Operativo",
-    };
-    const minExpRequired = position.min_experience_years || 2;
-
-    // Guardar archivos de Fase 1 y Selfie Transparente del Mini-Test
-    const cvResult = saveBase64File(cv_file, "cv", "pdf");
-    const credencialResult = saveBase64File(
-      credencial_file,
-      "credencial",
-      "jpg",
-    );
-    const selfieResult = saveBase64File(initial_selfie, "selfie_test", "jpg");
-
-    // Evaluar respuestas del Mini-Test Técnico (3 Técnicas + 2 SJT de Seguridad Crítica ECF)
-    const parsedAnswers = Array.isArray(answers)
-      ? answers
-      : JSON.parse(answers || "[]");
-    let score = 0;
-    let scoreTecnico = 0;
-    let scoreSjt = 0;
-    const totalQuestions = parsedAnswers.length;
-
-    for (const ans of parsedAnswers) {
-      const [qRow] = await pool.query(
-        "SELECT correct_option, category, question_text FROM questions WHERE id = ?",
-        [ans.question_id],
+      // Obtener requisitos ECF del cargo
+      const [posRows] = await pool.query(
+        "SELECT * FROM positions WHERE id = ?",
+        [position_id],
       );
-      if (qRow.length > 0) {
-        const qCat = qRow[0].category || "TECNICA";
-        if (qRow[0].correct_option === ans.selected_option) {
-          score++;
-          ans.is_correct = true;
-          if (qCat === "TECNICA") scoreTecnico++;
-          else if (qCat === "SJT") scoreSjt++;
+      const position = posRows[0] || {
+        min_experience_years: 2,
+        name: "Cargo Operativo",
+      };
+      const minExpRequired = position.min_experience_years || 2;
+
+      // Guardar archivos de Fase 1 y Selfie Transparente del Mini-Test
+      const cvResult = saveBase64File(cv_file, "cv", "pdf");
+      const credencialResult = saveBase64File(
+        credencial_file,
+        "credencial",
+        "jpg",
+      );
+      const selfieResult = saveBase64File(initial_selfie, "selfie_test", "jpg");
+      const randomSelfieResult = saveBase64File(
+        random_selfie,
+        "selfie_test_random",
+        "jpg",
+      );
+
+      // Evaluar respuestas del Mini-Test Técnico (3 Técnicas + 2 SJT de Seguridad Crítica ECF)
+      const parsedAnswers = Array.isArray(answers)
+        ? answers
+        : JSON.parse(answers || "[]");
+      let score = 0;
+      let scoreTecnico = 0;
+      let scoreSjt = 0;
+      const totalQuestions = parsedAnswers.length;
+
+      for (const ans of parsedAnswers) {
+        const [qRow] = await pool.query(
+          "SELECT correct_option, category, question_text FROM questions WHERE id = ?",
+          [ans.question_id],
+        );
+        if (qRow.length > 0) {
+          const qCat = qRow[0].category || "TECNICA";
+          if (qRow[0].correct_option === ans.selected_option) {
+            score++;
+            ans.is_correct = true;
+            if (qCat === "TECNICA") scoreTecnico++;
+            else if (qCat === "SJT") scoreSjt++;
+          } else {
+            ans.is_correct = false;
+          }
         } else {
           ans.is_correct = false;
         }
-      } else {
-        ans.is_correct = false;
       }
-    }
 
-    const sjtConforme = scoreSjt === 2;
-    const scoreRatio = totalQuestions > 0 ? score / totalQuestions : 0;
-    const passesScore = score >= 4; // Mínimo 80% (4 de 5)
-    const meetsExperience = expYears >= minExpRequired;
-    const passesQuiz = passesScore && sjtConforme;
+      const sjtConforme = scoreSjt === 2;
+      const scoreRatio = totalQuestions > 0 ? score / totalQuestions : 0;
+      const passesScore = score >= 4; // Mínimo 80% (4 de 5)
+      const meetsExperience = expYears >= minExpRequired;
+      const passesQuiz = passesScore && sjtConforme;
 
-    // Estado según regla de corte normativo de Fase 1 / 1.5
-    const nextStatus =
-      passesQuiz && meetsExperience ? "PRESELECCIONADO" : "DESCARTADO_TECNICO";
+      // Estado según regla de corte normativo de Fase 1 / 1.5
+      const nextStatus =
+        passesQuiz && meetsExperience
+          ? "PRESELECCIONADO"
+          : "DESCARTADO_TECNICO";
 
-    const rejectionReasons = [];
-    if (!sjtConforme) {
-      rejectionReasons.push(
-        "No conformidad con estándar ECF / Riesgo operacional crítico (Falló reactivo de Juicio Situacional / Paso Cero).",
+      const rejectionReasons = [];
+      if (!sjtConforme) {
+        rejectionReasons.push(
+          "No conformidad con estándar ECF / Riesgo operacional crítico (Falló reactivo de Juicio Situacional / Paso Cero).",
+        );
+      }
+      if (!passesScore) {
+        rejectionReasons.push(
+          `Puntaje en Mini-Test Técnico (${score}/${totalQuestions} — ${Math.round(scoreRatio * 100)}%) inferior al 80% mínimo requerido.`,
+        );
+      }
+      if (!meetsExperience) {
+        rejectionReasons.push(
+          `Experiencia declarada (${expYears} años) menor al mínimo exigido por el ECF Codelco (${minExpRequired} años).`,
+        );
+      }
+
+      const ocrTextPhase1 =
+        phase1_ocr_data && phase1_ocr_data.ocr_text
+          ? phase1_ocr_data.ocr_text
+          : "";
+      const ocrDetectedName =
+        phase1_ocr_data &&
+        phase1_ocr_data.full_name &&
+        isValidPersonName(phase1_ocr_data.full_name)
+          ? phase1_ocr_data.full_name
+          : null;
+      const ocrDetectedRut =
+        phase1_ocr_data && phase1_ocr_data.rut_id
+          ? phase1_ocr_data.rut_id
+          : null;
+      const ocrCredStatus =
+        phase1_ocr_data && phase1_ocr_data.credencial_status
+          ? phase1_ocr_data.credencial_status
+          : "Credencial Técnica Cargada";
+
+      // Auditar si editó manualmente respecto a la lectura de Fase 1
+      const editedFields = [];
+      if (
+        ocrDetectedName &&
+        normalizeTextForMatch(ocrDetectedName) !==
+          normalizeTextForMatch(formattedName)
+      ) {
+        editedFields.push(`Nombre Fase 1 (OCR: "${ocrDetectedName}")`);
+      }
+      if (ocrDetectedRut && formatRut(ocrDetectedRut) !== formattedRut) {
+        editedFields.push(`RUT Fase 1 (OCR: ${ocrDetectedRut})`);
+      }
+
+      const discrepancyNotesList = [...rejectionReasons];
+      if (
+        phase1_ocr_data &&
+        (phase1_ocr_data.rut_discrepancia ||
+          phase1_ocr_data.name_discrepancia) &&
+        phase1_ocr_data.discrepancia_nota
+      ) {
+        discrepancyNotesList.push(
+          `[AUDITORÍA DOCUMENTAL FASE 1]: ${phase1_ocr_data.discrepancia_nota}`,
+        );
+      }
+
+      const [candRes] = await pool.query(
+        `INSERT INTO candidates 
+      (full_name, rut_id, email, phone, city, experience_years, age, position_id, cv_file, credencial_file, cert_file, initial_selfie, random_selfie, score, total_questions, score_tecnico, score_sjt, sjt_conforme, status, ocr_text, ocr_detected_name, ocr_detected_rut, ocr_credencial_status, ocr_manually_edited, ocr_edited_fields, discrepancy_notes, consent_proctoring)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          formattedName,
+          formattedRut,
+          email || null,
+          phone || null,
+          city || "Rancagua / El Teniente",
+          expYears,
+          30,
+          parseInt(position_id, 10),
+          cvResult.url,
+          credencialResult.url,
+          credencialResult.url,
+          selfieResult.url,
+          randomSelfieResult ? randomSelfieResult.url : null,
+          score,
+          totalQuestions,
+          scoreTecnico,
+          scoreSjt,
+          sjtConforme ? 1 : 0,
+          nextStatus,
+          ocrTextPhase1,
+          ocrDetectedName,
+          ocrDetectedRut,
+          ocrCredStatus,
+          editedFields.length > 0 ? 1 : 0,
+          editedFields.join(" | ") || null,
+          discrepancyNotesList.join(" | ") || null,
+          consent_proctoring ? 1 : 0,
+        ],
       );
-    }
-    if (!passesScore) {
-      rejectionReasons.push(
-        `Puntaje en Mini-Test Técnico (${score}/${totalQuestions} — ${Math.round(scoreRatio * 100)}%) inferior al 80% mínimo requerido.`,
-      );
-    }
-    if (!meetsExperience) {
-      rejectionReasons.push(
-        `Experiencia declarada (${expYears} años) menor al mínimo exigido por el ECF Codelco (${minExpRequired} años).`,
-      );
-    }
 
-    const ocrTextPhase1 =
-      phase1_ocr_data && phase1_ocr_data.ocr_text
-        ? phase1_ocr_data.ocr_text
-        : "";
-    const ocrDetectedName =
-      phase1_ocr_data &&
-      phase1_ocr_data.full_name &&
-      isValidPersonName(phase1_ocr_data.full_name)
-        ? phase1_ocr_data.full_name
-        : null;
-    const ocrDetectedRut =
-      phase1_ocr_data && phase1_ocr_data.rut_id ? phase1_ocr_data.rut_id : null;
-    const ocrCredStatus =
-      phase1_ocr_data && phase1_ocr_data.credencial_status
-        ? phase1_ocr_data.credencial_status
-        : "Credencial Técnica Cargada";
+      const candidateId = candRes.insertId;
 
-    // Auditar si editó manualmente respecto a la lectura de Fase 1
-    const editedFields = [];
-    if (
-      ocrDetectedName &&
-      normalizeTextForMatch(ocrDetectedName) !==
-        normalizeTextForMatch(formattedName)
-    ) {
-      editedFields.push(`Nombre Fase 1 (OCR: "${ocrDetectedName}")`);
-    }
-    if (ocrDetectedRut && formatRut(ocrDetectedRut) !== formattedRut) {
-      editedFields.push(`RUT Fase 1 (OCR: ${ocrDetectedRut})`);
-    }
+      for (const ans of parsedAnswers) {
+        await pool.query(
+          "INSERT INTO candidate_answers (candidate_id, question_id, selected_option, is_correct) VALUES (?, ?, ?, ?)",
+          [candidateId, ans.question_id, ans.selected_option, ans.is_correct],
+        );
+      }
 
-    const discrepancyNotesList = [...rejectionReasons];
-    if (
-      phase1_ocr_data &&
-      (phase1_ocr_data.rut_discrepancia || phase1_ocr_data.name_discrepancia) &&
-      phase1_ocr_data.discrepancia_nota
-    ) {
-      discrepancyNotesList.push(
-        `[AUDITORÍA DOCUMENTAL FASE 1]: ${phase1_ocr_data.discrepancia_nota}`,
-      );
-    }
-
-    const [candRes] = await pool.query(
-      `INSERT INTO candidates 
-      (full_name, rut_id, email, phone, city, experience_years, age, position_id, cv_file, credencial_file, cert_file, initial_selfie, score, total_questions, score_tecnico, score_sjt, sjt_conforme, status, ocr_text, ocr_detected_name, ocr_detected_rut, ocr_credencial_status, ocr_manually_edited, ocr_edited_fields, discrepancy_notes, consent_proctoring)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        formattedName,
-        formattedRut,
-        email || null,
-        phone || null,
-        city || "Rancagua / El Teniente",
-        expYears,
-        30,
-        parseInt(position_id, 10),
-        cvResult.url,
-        credencialResult.url,
-        credencialResult.url,
-        selfieResult.url,
+      res.status(201).json({
+        candidateId,
         score,
         totalQuestions,
-        scoreTecnico,
-        scoreSjt,
-        sjtConforme ? 1 : 0,
-        nextStatus,
-        ocrTextPhase1,
-        ocrDetectedName,
-        ocrDetectedRut,
-        ocrCredStatus,
-        editedFields.length > 0 ? 1 : 0,
-        editedFields.join(" | ") || null,
-        discrepancyNotesList.join(" | ") || null,
-        consent_proctoring ? 1 : 0,
-      ],
-    );
-
-    const candidateId = candRes.insertId;
-
-    for (const ans of parsedAnswers) {
-      await pool.query(
-        "INSERT INTO candidate_answers (candidate_id, question_id, selected_option, is_correct) VALUES (?, ?, ?, ?)",
-        [candidateId, ans.question_id, ans.selected_option, ans.is_correct],
-      );
+        scorePercent: Math.round(scoreRatio * 100),
+        score_tecnico: scoreTecnico,
+        score_sjt: scoreSjt,
+        sjt_conforme: sjtConforme,
+        status: nextStatus,
+        qualifiedForPhase2: false, // Bloqueado: requiere aprobación formal de faena por RR.HH. para recibir enlace
+        rejectionReasons,
+        message:
+          nextStatus === "PRESELECCIONADO"
+            ? "Evaluación técnica aprobada. Su expediente quedó en estado PRESELECCIONADO en espera de asignación de cupo en faena por parte de RR.HH."
+            : "No califica en esta convocatoria.",
+      });
+    } catch (err) {
+      console.error("[Error /api/candidates/phase1-submit]:", err);
+      res.status(500).json({ error: err.message });
     }
-
-    res.status(201).json({
-      candidateId,
-      score,
-      totalQuestions,
-      scorePercent: Math.round(scoreRatio * 100),
-      score_tecnico: scoreTecnico,
-      score_sjt: scoreSjt,
-      sjt_conforme: sjtConforme,
-      status: nextStatus,
-      qualifiedForPhase2: false, // Bloqueado: requiere aprobación formal de faena por RR.HH. para recibir enlace
-      rejectionReasons,
-      message:
-        nextStatus === "PRESELECCIONADO"
-          ? "Evaluación técnica aprobada. Su expediente quedó en estado PRESELECCIONADO en espera de asignación de cupo en faena por parte de RR.HH."
-          : "No califica en esta convocatoria.",
-    });
-  } catch (err) {
-    console.error("[Error /api/candidates/phase1-submit]:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+  },
+);
 
 // 5. FASE 2 & FASE 3: Subida de Carnet + Antecedentes (Solo Preseleccionados) + Motor OCR de Validación Cruzada
 app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
@@ -3283,8 +3324,35 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
     let ocrCarnetVigencia = "Vigente";
     let ocrAntecedentesStatus = "Sin Anotaciones";
     let crossCheckOk = false;
+    let facialMatchOk = null;
+    let facialConfidence = null;
     let discrepancies = [];
     let combinedText = "";
+
+    // Cargar Base64 de las selfies guardadas en Fase 1 para el cotejo biométrico facial anti-fraude
+    const loadSelfieBase64 = (filePath) => {
+      if (!filePath) return null;
+      try {
+        const basename = path.basename(filePath);
+        const candidatesPaths = [
+          path.join(UPLOADS_DIR, basename),
+          path.join(__dirname, "..", filePath.replace(/^\//, "")),
+          path.join(__dirname, "../storage/uploads", basename),
+        ];
+        for (const p of candidatesPaths) {
+          if (fs.existsSync(p)) {
+            const buf = fs.readFileSync(p);
+            return `data:image/jpeg;base64,${buf.toString("base64")}`;
+          }
+        }
+      } catch (err) {
+        console.warn(`[Selfie Load Error] ${filePath}:`, err.message);
+      }
+      return null;
+    };
+
+    const initialSelfieBase64 = loadSelfieBase64(candidate.initial_selfie);
+    const randomSelfieBase64 = loadSelfieBase64(candidate.random_selfie);
 
     let geminiProcessed = false;
     if (geminiOcr.isGeminiAvailable()) {
@@ -3296,6 +3364,8 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
           carnetFrontBase64: carnet_file,
           carnetBackBase64: carnet_back_file,
           antecedentesBase64: antecedentes_file,
+          initialSelfieBase64,
+          randomSelfieBase64,
           phase1Rut: candidate.rut_id,
           phase1Name: candidate.full_name,
         });
@@ -3308,6 +3378,13 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
           ocrCarnetVigencia =
             g2.carnet_vigencia ||
             (g2.carnet_vigente_bool ? "Vigente" : "Vencido");
+
+          if (typeof g2.facial_match_ok === "boolean") {
+            facialMatchOk = g2.facial_match_ok ? 1 : 0;
+          }
+          if (typeof g2.facial_confidence_percent === "number") {
+            facialConfidence = Math.round(g2.facial_confidence_percent);
+          }
 
           // Cálculo DETERMINISTA de vigencia de antecedentes en JavaScript (máx. 60 días de antigüedad)
           let antecedentesVigente = true;
@@ -3371,6 +3448,13 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
 
           crossCheckOk =
             rutOk && carnetVigente && antecedentesVigente && !tieneAnotaciones;
+
+          if (g2.facial_match_ok === false) {
+            crossCheckOk = false;
+            discrepancies.push(
+              `[ALERTA SUPLANTACIÓN FACIAL: ${g2.facial_match_details || "Discrepancia en rasgos biométricos"}]`,
+            );
+          }
 
           if (crossCheckOk) {
             discrepancies = [];
@@ -3513,7 +3597,11 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
         !ocrAntecedentesStatus.includes("Con Anotaciones") &&
         discrepancies.length === 0;
     }
-    const finalStatus = crossCheckOk ? "PRE_ACREDITADO" : "EN_REVISION_MANUAL";
+    let finalStatus = crossCheckOk ? "PRE_ACREDITADO" : "EN_REVISION_MANUAL";
+    if (facialMatchOk === 0) {
+      crossCheckOk = false;
+      finalStatus = "EN_REVISION_MANUAL";
+    }
 
     const updatedOcrText = [candidate.ocr_text, combinedText]
       .filter(Boolean)
@@ -3525,8 +3613,9 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
         carnet_file = ?,
         carnet_back_file = ?,
         antecedentes_file = ?,
-        random_selfie = ?,
         status = ?,
+        facial_match_ok = ?,
+        facial_confidence = ?,
         ocr_text = ?,
         ocr_birth_date = ?,
         ocr_detected_age = ?,
@@ -3546,8 +3635,9 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
         carnetFrontRes.url,
         carnetBackRes.url,
         antecedentesRes.url,
-        carnetFrontRes.url, // Permite comparar Selfie del Test vs Foto del Carnet en el panel
         finalStatus,
+        facialMatchOk,
+        facialConfidence,
         updatedOcrText,
         ocrBirthDate,
         ocrDetectedAge,
@@ -3568,6 +3658,8 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
       candidateId: Number(id),
       status: finalStatus,
       crossCheckOk,
+      facialMatchOk: facialMatchOk !== null ? Boolean(facialMatchOk) : null,
+      facialConfidence,
       ocrCarnetName,
       ocrCarnetRut,
       ocrCarnetVigencia,

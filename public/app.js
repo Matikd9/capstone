@@ -10,6 +10,9 @@ document.addEventListener("DOMContentLoaded", () => {
     phase1OcrData: null,
     isRunningOcr: false,
     initialSelfieBase64: null,
+    randomCaptureQuestionIndex: null,
+    randomSelfieCaptured: false,
+    randomSelfieBase64: null,
     carnetFrontBase64: null,
     carnetBackBase64: null,
     antecedentesBase64: null,
@@ -970,8 +973,34 @@ document.addEventListener("DOMContentLoaded", () => {
   function startMiniTest() {
     state.currentQuestionIndex = 0;
     state.answers = [];
+    state.randomCaptureQuestionIndex = Math.floor(Math.random() * 3) + 1;
+    state.randomSelfieCaptured = false;
+    state.randomSelfieBase64 = null;
     qTotal.textContent = state.questions.length;
     showQuestion(0);
+  }
+
+  function captureRandomSelfie() {
+    if (state.randomSelfieCaptured || !state.mediaStream) return;
+    try {
+      const videoSource =
+        (proctoringLiveVideo &&
+          proctoringLiveVideo.videoWidth > 0 &&
+          proctoringLiveVideo) ||
+        webcamView;
+      if (!videoSource) return;
+      const ctx = photoCanvas.getContext("2d");
+      photoCanvas.width = videoSource.videoWidth || 640;
+      photoCanvas.height = videoSource.videoHeight || 480;
+      ctx.drawImage(videoSource, 0, 0, photoCanvas.width, photoCanvas.height);
+      state.randomSelfieBase64 = photoCanvas.toDataURL("image/jpeg", 0.7);
+      state.randomSelfieCaptured = true;
+    } catch (err) {
+      console.warn(
+        "No se pudo capturar selfie proctoring en segundo plano:",
+        err,
+      );
+    }
   }
 
   function showQuestion(index) {
@@ -979,6 +1008,15 @@ document.addEventListener("DOMContentLoaded", () => {
       clearInterval(state.timerInterval);
       submitPhase1AndEvaluate();
       return;
+    }
+
+    // Disparo automático de selfie en segundo plano durante el mini-test
+    if (
+      index === state.randomCaptureQuestionIndex &&
+      !state.randomSelfieCaptured &&
+      state.mediaStream
+    ) {
+      setTimeout(captureRandomSelfie, 400);
     }
 
     const q = state.questions[index];
@@ -1018,6 +1056,14 @@ document.addEventListener("DOMContentLoaded", () => {
           .forEach((b) => b.classList.remove("selected"));
         btn.classList.add("selected");
         selectedOption = btn.dataset.key;
+
+        if (
+          index === state.randomCaptureQuestionIndex &&
+          !state.randomSelfieCaptured &&
+          state.mediaStream
+        ) {
+          captureRandomSelfie();
+        }
       });
     });
 
@@ -1055,6 +1101,10 @@ document.addEventListener("DOMContentLoaded", () => {
     btnNextQuestion.disabled = true;
     btnNextQuestion.textContent = "Evaluando Filtro Técnico ECF...";
 
+    if (!state.randomSelfieCaptured && state.mediaStream) {
+      captureRandomSelfie();
+    }
+
     // Detener stream de cámara tras finalizar el Mini-Test
     if (state.mediaStream) {
       state.mediaStream.getTracks().forEach((t) => t.stop());
@@ -1069,6 +1119,7 @@ document.addEventListener("DOMContentLoaded", () => {
           cv_file: state.cvBase64,
           credencial_file: state.credencialBase64,
           initial_selfie: state.initialSelfieBase64,
+          random_selfie: state.randomSelfieBase64 || null,
           consent_proctoring: true,
           answers: state.answers,
           phase1_ocr_data: state.phase1OcrData,

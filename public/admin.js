@@ -442,6 +442,17 @@ document.addEventListener("DOMContentLoaded", () => {
       ? "var(--ecf-emerald)"
       : "var(--safety-yellow)";
 
+    let biometricBadge =
+      '<span class="badge-code">Biometría Facial: Pendiente Fase 2</span>';
+    if (candidate.facial_match_ok === 1 || candidate.facial_match_ok === true) {
+      biometricBadge = `<span class="badge-code" style="background: rgba(34, 197, 94, 0.2); color: #22c55e; border-color: rgba(34, 197, 94, 0.4);">Biometría Facial: Conforme (${candidate.facial_confidence ?? 95}% coincidencia)</span>`;
+    } else if (
+      candidate.facial_match_ok === 0 ||
+      candidate.facial_match_ok === false
+    ) {
+      biometricBadge = `<span class="badge-code" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); font-weight: bold;">Alerta de Fraude: Posible Suplantación Facial (${candidate.facial_confidence ?? 0}% coincidencia)</span>`;
+    }
+
     modalBody.innerHTML = `
       <div class="info-grid">
         <div class="info-item">
@@ -495,17 +506,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
       <!-- Comparativa Visual de Identidad (Face Match: Selfie Transparente vs. Foto Carnet) -->
       <div class="media-box">
-        <h3>Validación Visual de Identidad (Selfie Proctoring Transparente vs. Cédula)</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <h3 style="margin: 0;">Validación Visual de Identidad (Selfie Proctoring Transparente vs. Cédula)</h3>
+          ${biometricBadge}
+        </div>
         <p style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-          Contraste la Selfie Informada tomada en el Mini-Test Técnico (Fase 1.5) contra la foto de la Cédula de Identidad cargada en la Pre-Acreditación (Fase 2).
+          Contraste la Selfie Inicial y Captura en Vivo tomadas durante el Mini-Test Técnico (Fase 1.5) contra la foto de la Cédula de Identidad cargada en la Pre-Acreditación (Fase 2).
         </p>
-        <div class="media-comparison-grid">
+        <div class="media-comparison-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
           <div>
-            <strong style="font-size: 0.85rem;">Selfie Transparente (Mini-Test Fase 1.5):</strong>
+            <strong style="font-size: 0.85rem;">Selfie Inicial (Fase 1.5 - Pre-Test):</strong>
             ${
               candidate.initial_selfie
-                ? `<img src="${candidate.initial_selfie}" alt="Selfie Mini-Test">`
-                : '<p class="loading-td">Sin selfie de test</p>'
+                ? `<img src="${candidate.initial_selfie}" alt="Selfie Inicial">`
+                : '<p class="loading-td">Sin selfie inicial</p>'
+            }
+          </div>
+          <div>
+            <strong style="font-size: 0.85rem;">Captura en Vivo (Durante el Mini-Test):</strong>
+            ${
+              candidate.random_selfie
+                ? `<img src="${candidate.random_selfie}" alt="Captura en Vivo">`
+                : '<p class="loading-td">Sin captura de test</p>'
             }
           </div>
           <div>

@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
     const badge = document.getElementById("admin-user-badge");
     if (badge && adminUser.username) {
-      badge.textContent = `[OPERADOR: ${adminUser.username.toUpperCase()}]`;
+      badge.textContent = `Administrador RR.HH. · ${adminUser.username}`;
     }
   } catch (e) {}
 
@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (res.status === 401 || res.status === 403) {
       if (typeof showToast === "function") {
         showToast(
-          "[SESIÓN EXPIRADA] Redirigiendo a pantalla de acceso...",
+          "Sesión expirada. Redirigiendo a la pantalla de acceso...",
           "warn",
         );
       }
@@ -109,25 +109,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 }) + " hrs"
               : "Reciente";
 
-          const isPending =
-            n.status === "EN_REVISION_MANUAL" || n.status === "DOCS_CARGADOS";
-          const statusClass = isPending ? "status-revision" : "status-approved";
-          const statusLabel = isPending
-            ? "Requiere Auditoría OCR"
-            : "Pre-Acreditado";
-
           return `
-          <div class="notification-item" onclick="openCandidateFromNotification(${n.id})">
-            <div class="notification-item-top">
+          <button type="button" class="notification-item" onclick="openCandidateFromNotification(${n.id})">
+            <span class="notification-item-top">
               <span class="notification-item-name">${escapeHtml(n.full_name)}</span>
               <span class="notification-item-time">${timeStr}</span>
-            </div>
-            <div class="notification-item-desc">${escapeHtml(n.rut_id)} · ${escapeHtml(n.position_name || "Especialidad")}</div>
-            <div class="notification-item-footer">
-              <span class="status-pill ${statusClass}" style="font-size: 0.65rem; padding: 0.15rem 0.5rem;">${statusLabel}</span>
-              <span style="font-size: 0.75rem; color: var(--primary); font-weight: 700; text-decoration: underline;">Auditar &rarr;</span>
-            </div>
-          </div>
+            </span>
+            <span class="notification-item-desc">${escapeHtml(n.rut_id)} · ${escapeHtml(n.position_name || "Especialidad")}</span>
+            <span class="notification-item-footer">
+              <span class="status-pill ${getStatusPillClass(n.status)}">${escapeHtml(statusLabel(n.status))}</span>
+              <span class="notification-item-cta">Auditar</span>
+            </span>
+          </button>
         `;
         })
         .join("");
@@ -212,11 +205,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const item = document.createElement("div");
     item.className = `toast-item toast-${type}`;
 
-    const iconTag =
-      type === "success" ? "[OK]" : type === "warn" ? "[AVISO]" : "[ERROR]";
+    const iconPath =
+      type === "success"
+        ? '<polyline points="20 6 9 17 4 12"></polyline>'
+        : type === "warn"
+          ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>'
+          : '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>';
     item.innerHTML = `
-      <span class="toast-icon">${iconTag}</span>
-      <span>${escapeHtml(message)}</span>
+      <svg class="toast-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPath}</svg>
+      <span class="toast-text">${escapeHtml(message)}</span>
     `;
 
     container.appendChild(item);
@@ -245,13 +242,11 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Enlace copiado exitosamente al portapapeles.", "success");
       if (btnElement) {
         const orig = btnElement.textContent;
-        btnElement.textContent = "[ ENLACE COPIADO ]";
-        btnElement.style.borderColor = "var(--ecf-emerald)";
-        btnElement.style.color = "var(--ecf-emerald)";
+        btnElement.textContent = "Enlace copiado";
+        btnElement.classList.add("is-copied");
         setTimeout(() => {
           btnElement.textContent = orig;
-          btnElement.style.borderColor = "";
-          btnElement.style.color = "";
+          btnElement.classList.remove("is-copied");
         }, 2500);
       }
     } catch (err) {
@@ -260,17 +255,46 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function getStatusPillClass(status) {
+    // Clase legada + clase granular por estado (status-<ESTADO>) para el código de casco
+    const granular = `status-${String(status || "").replace(/[^A-Za-z0-9_-]/g, "")}`;
     if (["PRE_ACREDITADO", "CONTRATADO_FAENA", "Aprobado"].includes(status)) {
-      return "status-Aprobado";
+      return `status-Aprobado ${granular}`;
     }
     if (status === "APROBADO_FAENA") {
-      return "status-Pendiente";
+      return `status-Pendiente ${granular}`;
     }
     if (["DESCARTADO_TECNICO", "Rechazado"].includes(status)) {
-      return "status-Rechazado";
+      return `status-Rechazado ${granular}`;
     }
-    return "status-Pendiente";
+    return `status-Pendiente ${granular}`;
   }
+
+  // Etiquetas legibles de estado (solo presentación; el valor enviado al servidor no cambia)
+  const STATUS_LABELS = {
+    POSTULADO: "Postulado",
+    PRESELECCIONADO: "Preseleccionado",
+    DESCARTADO_TECNICO: "Descartado técnico",
+    APROBADO_FAENA: "Aprobado faena",
+    DOCS_CARGADOS: "Docs. cargados",
+    PRE_ACREDITADO: "Pre-acreditado",
+    EN_REVISION_MANUAL: "En revisión manual",
+    CONTRATADO_FAENA: "Contratado faena",
+  };
+
+  function statusLabel(status) {
+    return STATUS_LABELS[status] || String(status || "");
+  }
+
+  // Orden "acción primero": revisión manual, docs cargados, preseleccionado / aprobado faena, resto
+  function actionRank(status) {
+    if (status === "EN_REVISION_MANUAL") return 0;
+    if (status === "DOCS_CARGADOS") return 1;
+    if (status === "PRESELECCIONADO" || status === "APROBADO_FAENA") return 2;
+    return 3;
+  }
+
+  // Último expediente cuyo estado cambió desde el panel (para animar su celda tras recargar)
+  let lastStatusChangeId = null;
 
   // 1. Cargar Especialidades para filtro
   async function loadPositions() {
@@ -321,12 +345,28 @@ document.addEventListener("DOMContentLoaded", () => {
       const candidates = await res.json();
 
       if (!Array.isArray(candidates) || candidates.length === 0) {
-        candidatesTbody.innerHTML = `<tr><td colspan="9" class="loading-td">No hay postulaciones registradas para este filtro.</td></tr>`;
+        candidatesTbody.innerHTML = `<tr><td colspan="9" class="loading-td loading-td--empty"><strong>No hay postulaciones para este filtro.</strong><span>Cambia la especialidad o el estado para ampliar la búsqueda.</span></td></tr>`;
         return;
       }
 
-      candidatesTbody.innerHTML = candidates
-        .map((c) => {
+      // Copia ordenada en cliente (sort estable: conserva el orden del servidor dentro de cada grupo)
+      const sorted = candidates
+        .slice()
+        .sort((a, b) => actionRank(a.status) - actionRank(b.status));
+      const actionCount = sorted.filter((c) => actionRank(c.status) < 3).length;
+      const restCount = sorted.length - actionCount;
+
+      const groupRow = (label, count) =>
+        `<tr class="group-row"><td colspan="9"><span class="group-row-label">${label}</span> <span class="group-row-count">(${count})</span></td></tr>`;
+
+      candidatesTbody.innerHTML = sorted
+        .map((c, idx) => {
+          let groupHeader = "";
+          if (idx === 0 && actionCount > 0) {
+            groupHeader = groupRow("Requiere acción", actionCount);
+          } else if (idx === actionCount && actionCount > 0 && restCount > 0) {
+            groupHeader = groupRow("Resto de expedientes", restCount);
+          }
           const scorePercent =
             c.total_questions > 0
               ? Math.round((c.score / c.total_questions) * 100)
@@ -341,21 +381,21 @@ document.addEventListener("DOMContentLoaded", () => {
               "Expediente consistente. Sin observaciones.",
             ),
           );
-          let crossCheckBadge = '<span class="badge-code">[FASE 01]</span>';
+          let crossCheckBadge = '<span class="badge-code">Fase 01</span>';
           if (c.ocr_cross_check_ok) {
             crossCheckBadge =
-              '<span class="badge-code" style="color: var(--ecf-emerald); border-color: var(--ecf-emerald-border); background: var(--ecf-emerald-dim);">[CONFORME ECF]</span>';
+              '<span class="badge-code badge-code--ok">Conforme ECF</span>';
           } else if (c.status === "EN_REVISION_MANUAL") {
             if (hasRealDiscrepancy) {
               crossCheckBadge =
-                '<span class="badge-code" style="color: var(--safety-yellow); border-color: var(--safety-yellow); background: var(--safety-yellow-dim);">[DISCORDANCIA OCR]</span>';
+                '<span class="badge-code badge-code--warn">Discordancia OCR</span>';
             } else {
               crossCheckBadge =
-                '<span class="badge-code" style="color: var(--ecf-emerald); border-color: var(--ecf-emerald-border); background: var(--ecf-emerald-dim);">[EN REVISIÓN // CONFORME]</span>';
+                '<span class="badge-code badge-code--ok">En revisión · conforme</span>';
             }
           } else if (c.status === "DESCARTADO_TECNICO") {
             crossCheckBadge =
-              '<span class="badge-code" style="color: var(--ecf-crimson); border-color: var(--ecf-crimson-border); background: var(--ecf-crimson-dim);">[NO CONFORME ECF]</span>';
+              '<span class="badge-code badge-code--danger">No conforme ECF</span>';
           }
 
           const canExport = [
@@ -365,39 +405,46 @@ document.addEventListener("DOMContentLoaded", () => {
             "Aprobado",
           ].includes(c.status);
 
-          return `
-          <tr>
-            <td><strong style="color: var(--safety-yellow); font-family: 'IBM Plex Mono', monospace;">#${c.id}</strong></td>
-            <td><strong style="color: var(--text-primary); font-family: 'IBM Plex Mono', monospace;">${escapeHtml(c.full_name)}</strong></td>
-            <td><span style="font-family: 'IBM Plex Mono', monospace; color: var(--text-secondary);">${escapeHtml(c.rut_id)}</span></td>
-            <td><span style="font-family: 'IBM Plex Mono', monospace;">${expDisplay}</span></td>
-            <td><span class="position-tag">${escapeHtml(c.position_name)}</span></td>
+          const stateKey = String(c.status || "").replace(
+            /[^A-Za-z0-9_-]/g,
+            "",
+          );
+
+          return `${groupHeader}
+          <tr data-id="${c.id}">
+            <td><span class="cell-folio">#${c.id}</span></td>
+            <td><strong class="cell-name">${escapeHtml(c.full_name)}</strong></td>
+            <td><span class="cell-num cell-muted">${escapeHtml(c.rut_id)}</span></td>
+            <td><span class="cell-num">${expDisplay}</span></td>
+            <td><span class="cell-position">${escapeHtml(c.position_name)}</span></td>
             <td>
-              <span class="badge-code">${c.score}/${c.total_questions} (${scorePercent}%)</span>
-              <div style="font-size: 0.72rem; margin-top: 0.25rem; font-family: 'IBM Plex Mono', monospace; color: var(--text-secondary);">
-                Téc: <strong>${c.score_tecnico ?? 0}/3</strong> | SJT: <strong style="color: ${c.sjt_conforme ? "var(--ecf-emerald)" : "var(--ecf-crimson)"};">${c.sjt_conforme ? "2/2" : `${c.score_sjt ?? 0}/2`}</strong>
-              </div>
+              <span class="cell-score">${c.score}/${c.total_questions} <span class="cell-muted">(${scorePercent}%)</span></span>
+              <span class="score-sub">
+                Téc. <strong>${c.score_tecnico ?? 0}/3</strong> · SJT <strong class="${c.sjt_conforme ? "value--ok" : "value--danger"}">${c.sjt_conforme ? "2/2" : `${c.score_sjt ?? 0}/2`}</strong>
+              </span>
             </td>
-            <td>
+            <td class="cell-stack">
               ${crossCheckBadge}
-              ${!c.sjt_conforme && c.status === "DESCARTADO_TECNICO" ? `<br><span class="badge-code" style="color: var(--ecf-crimson); border-color: var(--ecf-crimson-border); background: var(--ecf-crimson-dim); margin-top: 0.25rem; display: inline-block;">[RIESGO OPERACIONAL ECF]</span>` : ""}
+              ${!c.sjt_conforme && c.status === "DESCARTADO_TECNICO" ? `<span class="badge-code badge-code--danger">Riesgo operacional ECF</span>` : ""}
+            </td>
+            <td class="cell-state" data-state="${stateKey}">
+              <span class="status-pill ${getStatusPillClass(c.status)}">${escapeHtml(statusLabel(c.status))}</span>
             </td>
             <td>
-              <span class="status-pill ${getStatusPillClass(c.status)}">${escapeHtml(c.status)}</span>
-            </td>
-            <td style="display: flex; gap: 0.4rem; align-items: center;">
-              <button class="btn btn-secondary btn-sm" onclick="viewCandidate(${c.id})">
+              <div class="row-actions">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="viewCandidate(${c.id})">
                 Auditar
               </button>
               ${
                 canExport
                   ? `
-                <a href="/api/admin/candidates/${c.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-primary btn-sm" title="Generar Carpeta Estandarizada WebControl">
+                <a href="/api/admin/candidates/${c.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-secondary btn-sm btn-export" title="Generar Carpeta Estandarizada WebControl">
                   WebControl
                 </a>
               `
                   : ""
               }
+              </div>
             </td>
           </tr>
         `;
@@ -406,10 +453,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
       window.currentCandidates = candidates;
       updateTopScrollWidth();
+      flipStateCell(lastStatusChangeId);
+      lastStatusChangeId = null;
     } catch (e) {
-      candidatesTbody.innerHTML = `<tr><td colspan="9" class="loading-td">Error conectando con la base de datos</td></tr>`;
+      candidatesTbody.innerHTML = `<tr><td colspan="9" class="loading-td loading-td--error"><strong>Error conectando con la base de datos.</strong><span>Revisa la conexión y usa «Actualizar matriz» para reintentar.</span></td></tr>`;
       updateTopScrollWidth();
     }
+  }
+
+  // Volteo tipo split-flap de la celda Estado recién repintada (solo presentación)
+  function flipStateCell(id) {
+    if (id === null || id === undefined) return;
+    const cell = candidatesTbody.querySelector(
+      `tr[data-id="${Number(id)}"] td.cell-state`,
+    );
+    if (!cell) return;
+    cell.classList.remove("is-flipping");
+    void cell.offsetWidth;
+    cell.classList.add("is-flipping");
+    setTimeout(() => cell.classList.remove("is-flipping"), 700);
   }
 
   // 4. Abrir Modal de Auditoría y Validación Cruzada
@@ -417,7 +479,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const candidate = window.currentCandidates.find((c) => c.id === id);
     if (!candidate) return;
 
-    modalTitle.textContent = `Expediente #${candidate.id}: ${candidate.full_name}`;
+    const headStateKey = String(candidate.status || "").replace(
+      /[^A-Za-z0-9_-]/g,
+      "",
+    );
+    modalTitle.innerHTML = `<span class="drawer-title-text">${escapeHtml(`Expediente #${candidate.id}: ${candidate.full_name}`)}</span>
+      <span class="drawer-state" data-state="${headStateKey}"><span class="drawer-state-swatch" aria-hidden="true"></span><span class="visually-hidden">Estado actual: </span>${escapeHtml(statusLabel(candidate.status))}</span>`;
+
+    // Botones de decisión: el estado vigente queda deshabilitado y marcado; naranjo solo si es acción disponible
+    const decisionButton = (status, label, variant) => {
+      const isCurrent = candidate.status === status;
+      if (isCurrent) {
+        return `<button type="button" class="btn btn-secondary btn-sm btn-current" disabled aria-describedby="decision-current-note"><span class="btn-current-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Estado actual</span> <span class="btn-current-label">${label}</span></button>`;
+      }
+      return `<button type="button" class="btn ${variant} btn-sm" onclick="updateCandidateStatus(${candidate.id}, '${status}')">${label}</button>`;
+    };
 
     const scorePercent =
       candidate.total_questions > 0
@@ -432,172 +508,168 @@ document.addEventListener("DOMContentLoaded", () => {
       candidate.discrepancy_notes.includes(
         "Expediente consistente. Sin observaciones.",
       );
-    const diagBorder = isExpedienteConforme
-      ? "var(--ecf-emerald-border)"
-      : "var(--safety-yellow)";
-    const diagBg = isExpedienteConforme
-      ? "var(--ecf-emerald-dim)"
-      : "var(--safety-yellow-dim)";
-    const diagColor = isExpedienteConforme
-      ? "var(--ecf-emerald)"
-      : "var(--safety-yellow)";
+    const diagClass = isExpedienteConforme ? "callout--ok" : "callout--warn";
 
     let biometricBadge =
-      '<span class="badge-code">Biometría Facial: Pendiente Fase 2</span>';
+      '<span class="badge-code">Biometría facial: pendiente Fase 2</span>';
     if (candidate.facial_match_ok === 1 || candidate.facial_match_ok === true) {
-      biometricBadge = `<span class="badge-code" style="background: rgba(34, 197, 94, 0.2); color: #22c55e; border-color: rgba(34, 197, 94, 0.4);">Biometría Facial: Conforme (${candidate.facial_confidence ?? 95}% coincidencia)</span>`;
+      biometricBadge = `<span class="badge-code badge-code--ok">Biometría facial: conforme (${candidate.facial_confidence ?? 95}% coincidencia)</span>`;
     } else if (
       candidate.facial_match_ok === 0 ||
       candidate.facial_match_ok === false
     ) {
-      biometricBadge = `<span class="badge-code" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); font-weight: bold;">Alerta de Fraude: Posible Suplantación Facial (${candidate.facial_confidence ?? 0}% coincidencia)</span>`;
+      biometricBadge = `<span class="badge-code badge-code--danger badge-code--strong">Alerta de fraude: posible suplantación facial (${candidate.facial_confidence ?? 0}% coincidencia)</span>`;
     }
 
     modalBody.innerHTML = `
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="label">RUT / RUN</span>
-          <span class="value">${escapeHtml(candidate.rut_id)}</span>
+      <section class="drawer-section">
+        <h3 class="drawer-section-title">Resumen de evaluación</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="label">RUT / RUN</span>
+            <span class="value">${escapeHtml(candidate.rut_id)}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Experiencia declarada</span>
+            <span class="value">${candidate.experience_years || 2} años en faena</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Calce de cargo (IA)</span>
+            <span class="value ${(candidate.role_fit_percentage ?? 80) >= 70 ? "value--ok" : "value--warn"}">
+              ${candidate.role_fit_percentage ? `${candidate.role_fit_percentage}% Afinidad` : "Conforme (80%)"}
+            </span>
+          </div>
+          <div class="info-item">
+            <span class="label">Exp. en oficio específico</span>
+            <span class="value">${candidate.experience_years_in_role ?? candidate.experience_years ?? 2} años</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Especialidad & ECF</span>
+            <span class="value">${escapeHtml(candidate.position_name)}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Score técnico (P1 a P3)</span>
+            <span class="value">${candidate.score_tecnico ?? 0} / 3</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Índice conductual ECF (SJT)</span>
+            <span class="value ${candidate.sjt_conforme ? "value--ok" : "value--danger"}">
+              ${candidate.sjt_conforme ? "Conforme (2/2)" : "No conforme (falla crítica)"}
+            </span>
+          </div>
+          <div class="info-item">
+            <span class="label">Veredicto Fase 1.5</span>
+            <span class="status-pill ${getStatusPillClass(candidate.status)}">${escapeHtml(statusLabel(candidate.status))}</span>
+          </div>
         </div>
-        <div class="info-item">
-          <span class="label">Experiencia Declarada</span>
-          <span class="value">${candidate.experience_years || 2} años en faena</span>
-        </div>
-        <div class="info-item">
-          <span class="label">Calce de Cargo (IA)</span>
-          <span class="value" style="color: ${(candidate.role_fit_percentage ?? 80) >= 70 ? "var(--ecf-emerald)" : "var(--safety-yellow)"};">
-            ${candidate.role_fit_percentage ? `${candidate.role_fit_percentage}% Afinidad` : "Conforme (80%)"}
-          </span>
-        </div>
-        <div class="info-item">
-          <span class="label">Exp. en Oficio Específico</span>
-          <span class="value">${candidate.experience_years_in_role ?? candidate.experience_years ?? 2} años</span>
-        </div>
-        <div class="info-item">
-          <span class="label">Especialidad & ECF</span>
-          <span class="value">${escapeHtml(candidate.position_name)}</span>
-        </div>
-        <div class="info-item">
-          <span class="label">Score Técnico (P1 a P3)</span>
-          <span class="value">[${candidate.score_tecnico ?? 0} / 3]</span>
-        </div>
-        <div class="info-item">
-          <span class="label">Índice Conductual ECF (SJT)</span>
-          <span class="value" style="color: ${candidate.sjt_conforme ? "var(--ecf-emerald)" : "var(--ecf-crimson)"};">
-            [${candidate.sjt_conforme ? "CONFORME (2/2)" : "NO CONFORME (Falla Crítica)"}]
-          </span>
-        </div>
-        <div class="info-item">
-          <span class="label">Veredicto Fase 1.5</span>
-          <span class="status-pill ${getStatusPillClass(candidate.status)}">[${escapeHtml(candidate.status)}]</span>
-        </div>
-      </div>
 
-      ${
-        !candidate.sjt_conforme
-          ? `
-        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid var(--ecf-crimson-border); background: var(--ecf-crimson-dim); color: var(--ecf-crimson); font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem;">
-          <strong>[ALERTA AUDITORÍA: RIESGO OPERACIONAL CRÍTICO]</strong><br>
-          El postulante falló al menos un reactivo de Juicio Situacional (SJT). Vulneró el principio de detención de faena ('Paso Cero' / Derecho a Decir NO) o no detuvo la maniobra ante falla de estabilidad de grúa. Descartado por regla de corte normativo excluyente ECF Codelco.
-        </div>
-      `
-          : ""
-      }
+        ${
+          !candidate.sjt_conforme
+            ? `
+          <div class="callout callout--danger">
+            <strong class="callout-title">Alerta de auditoría: riesgo operacional crítico</strong>
+            El postulante falló al menos un reactivo de Juicio Situacional (SJT). Vulneró el principio de detención de faena ('Paso Cero' / Derecho a Decir NO) o no detuvo la maniobra ante falla de estabilidad de grúa. Descartado por regla de corte normativo excluyente ECF Codelco.
+          </div>
+        `
+            : ""
+        }
+      </section>
 
       <!-- Comparativa Visual de Identidad (Face Match: Selfie Transparente vs. Foto Carnet) -->
-      <div class="media-box">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-          <h3 style="margin: 0;">Validación Visual de Identidad (Selfie Proctoring Transparente vs. Cédula)</h3>
+      <section class="drawer-section media-box">
+        <div class="drawer-section-head">
+          <h3 class="drawer-section-title">Validación visual de identidad (selfie vs. cédula)</h3>
           ${biometricBadge}
         </div>
-        <p style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        <p class="drawer-section-desc">
           Contraste la Selfie Inicial y Captura en Vivo tomadas durante el Mini-Test Técnico (Fase 1.5) contra la foto de la Cédula de Identidad cargada en la Pre-Acreditación (Fase 2).
         </p>
-        <div class="media-comparison-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-          <div>
-            <strong style="font-size: 0.85rem;">Selfie Inicial (Fase 1.5 - Pre-Test):</strong>
+        <div class="media-comparison-grid">
+          <figure class="media-figure">
+            <figcaption>Selfie inicial (Fase 1.5 · pre-test)</figcaption>
             ${
               candidate.initial_selfie
                 ? `<img src="${candidate.initial_selfie}" alt="Selfie Inicial">`
                 : '<p class="loading-td">Sin selfie inicial</p>'
             }
-          </div>
-          <div>
-            <strong style="font-size: 0.85rem;">Captura en Vivo (Durante el Mini-Test):</strong>
+          </figure>
+          <figure class="media-figure">
+            <figcaption>Captura en vivo (durante el mini-test)</figcaption>
             ${
               candidate.random_selfie
                 ? `<img src="${candidate.random_selfie}" alt="Captura en Vivo">`
                 : '<p class="loading-td">Sin captura de test</p>'
             }
-          </div>
-          <div>
-            <strong style="font-size: 0.85rem;">Cédula de Identidad (Fase 2 Pre-Acreditación):</strong>
+          </figure>
+          <figure class="media-figure">
+            <figcaption>Cédula de identidad (Fase 2 · pre-acreditación)</figcaption>
             ${
               carnetUrl
                 ? `<img src="${carnetUrl}" alt="Cédula de Identidad">`
                 : '<p class="loading-td">No requerida / Pendiente Fase 2</p>'
             }
-          </div>
+          </figure>
         </div>
-      </div>
+      </section>
 
       <!-- Matriz de Validación Cruzada OCR (Fase 3) -->
-      <div class="media-box" style="text-align: left;">
-        <h3 style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-          <span>Matriz de Validación Cruzada OCR (Fase 1 vs. Fase 2)</span>
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <button id="btn-reprocess-ocr" class="btn btn-secondary btn-sm" onclick="reprocessCandidateOcr(${candidate.id})">Re-analizar OCR</button>
-            <span class="status-pill ${getStatusPillClass(candidate.status)}">${escapeHtml(candidate.status)}</span>
+      <section class="drawer-section media-box">
+        <div class="drawer-section-head">
+          <h3 class="drawer-section-title">Validación cruzada OCR (Fase 1 vs. Fase 2)</h3>
+          <div class="drawer-section-tools">
+            <button type="button" id="btn-reprocess-ocr" class="btn btn-secondary btn-sm" onclick="reprocessCandidateOcr(${candidate.id})">Re-analizar OCR</button>
+            <span class="status-pill ${getStatusPillClass(candidate.status)}">${escapeHtml(statusLabel(candidate.status))}</span>
           </div>
-        </h3>
-
-        <div style="margin-top: 0.85rem; font-size: 0.88rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
-          <p><strong>1. Credencial Técnica (Fase 1):</strong><br>${escapeHtml(candidate.ocr_credencial_status || candidate.required_credential || "Verificada")}</p>
-          <p><strong>2. Cruce Nombre / RUT (OCR):</strong><br>${escapeHtml(candidate.ocr_detected_name || candidate.full_name)} (${escapeHtml(candidate.ocr_detected_rut || candidate.rut_id)})</p>
-          <p><strong>3. Vigencia Cédula (OCR):</strong><br>${escapeHtml(candidate.ocr_carnet_vigencia || "Pendiente Fase 2")}</p>
-          <p><strong>4. Cert. Antecedentes (OCR):</strong><br>${escapeHtml(candidate.ocr_antecedentes_status || "Pendiente Fase 2")}</p>
         </div>
 
-        <div style="margin-top: 0.85rem; padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid ${diagBorder}; background: ${diagBg}; color: ${diagColor}; font-size: 0.85rem; font-family: 'IBM Plex Mono', monospace;">
-          <strong>DIAGNÓSTICO NORMATIVO (ECF / DS N° 132):</strong><br>
+        <dl class="check-list">
+          <div class="check-item"><dt>1. Credencial técnica (Fase 1)</dt><dd>${escapeHtml(candidate.ocr_credencial_status || candidate.required_credential || "Verificada")}</dd></div>
+          <div class="check-item"><dt>2. Cruce nombre / RUT (OCR)</dt><dd>${escapeHtml(candidate.ocr_detected_name || candidate.full_name)} (${escapeHtml(candidate.ocr_detected_rut || candidate.rut_id)})</dd></div>
+          <div class="check-item"><dt>3. Vigencia cédula (OCR)</dt><dd>${escapeHtml(candidate.ocr_carnet_vigencia || "Pendiente Fase 2")}</dd></div>
+          <div class="check-item"><dt>4. Cert. antecedentes (OCR)</dt><dd>${escapeHtml(candidate.ocr_antecedentes_status || "Pendiente Fase 2")}</dd></div>
+        </dl>
+
+        <div class="callout ${diagClass}">
+          <strong class="callout-title">Diagnóstico normativo (ECF / DS N° 132)</strong>
           ${escapeHtml(candidate.discrepancy_notes || "Expediente consistente. Sin observaciones.")}
-          ${candidate.ocr_manually_edited ? `<br><em>Nota de Auditoría: El postulante editó manualmente en Fase 1: ${escapeHtml(candidate.ocr_edited_fields || "")}</em>` : ""}
+          ${candidate.ocr_manually_edited ? `<em class="callout-note">Nota de auditoría: el postulante editó manualmente en Fase 1: ${escapeHtml(candidate.ocr_edited_fields || "")}</em>` : ""}
         </div>
 
         ${
           candidate.ocr_text
             ? `
-          <details style="margin-top: 0.75rem; background: var(--surface-panel); padding: 0.75rem; border-radius: var(--radius-terminal); border: 1px solid var(--border-structural);">
-            <summary style="cursor: pointer; font-weight: 700; font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between;">
-              <span>[VER LOG DE TEXTO EXTRAÍDO POR OCR]</span>
+          <details class="ocr-log">
+            <summary>
+              <span class="ocr-log-label">Ver texto extraído por OCR</span>
               ${
                 candidate.ocr_text.includes("[MOTOR: GEMINI") ||
                 candidate.ocr_text.includes("[MOTOR: IA")
-                  ? '<span class="badge" style="background: rgba(16,185,129,0.15); color: var(--ecf-emerald); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--ecf-emerald);">MOTOR: IA GEMINI FLASH</span>'
-                  : '<span class="badge" style="background: rgba(255,184,0,0.15); color: var(--safety-yellow); font-size:0.7rem; padding: 2px 6px; border-radius:2px; border: 1px solid var(--safety-yellow);">MOTOR: LOCAL TESSERACT (FALLBACK)</span>'
+                  ? '<span class="badge badge--engine-ai">Motor: IA Gemini Flash</span>'
+                  : '<span class="badge badge--engine-local">Motor: local Tesseract (fallback)</span>'
               }
             </summary>
-            <pre style="white-space: pre-wrap; font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; margin-top: 0.5rem; max-height: 150px; overflow-y: auto; color: var(--text-primary);">${escapeHtml(candidate.ocr_text)}</pre>
+            <pre>${escapeHtml(candidate.ocr_text)}</pre>
           </details>
         `
             : ""
         }
-      </div>
+      </section>
 
       <!-- Documentación del Expediente WebControl -->
-      <div class="media-box">
-        <h3>Archivos del Expediente (Visor Seguro en Sandbox Anti-Malware)</h3>
-        <div style="display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap; margin-top:0.65rem;">
-          ${credencialUrl ? `<button type="button" onclick="openSecureDocViewer('${credencialUrl}', 'Credencial Técnica ECF')" class="btn btn-secondary btn-sm">Ver Credencial (Aislado)</button>` : ""}
-          ${candidate.cv_file ? `<button type="button" onclick="openSecureDocViewer('${candidate.cv_file}', 'Currículum Vitae (CV)')" class="btn btn-secondary btn-sm">Ver CV (Aislado)</button>` : ""}
-          ${carnetUrl ? `<button type="button" onclick="openSecureDocViewer('${carnetUrl}', 'Cédula de Identidad (Frente)')" class="btn btn-secondary btn-sm">Ver Cédula Frente</button>` : ""}
-          ${candidate.carnet_back_file ? `<button type="button" onclick="openSecureDocViewer('${candidate.carnet_back_file}', 'Cédula de Identidad (Reverso)')" class="btn btn-secondary btn-sm">Ver Cédula Reverso</button>` : ""}
-          ${candidate.antecedentes_file ? `<button type="button" onclick="openSecureDocViewer('${candidate.antecedentes_file}', 'Certificado de Antecedentes')" class="btn btn-secondary btn-sm">Ver Antecedentes</button>` : ""}
-          <a href="/api/admin/candidates/${candidate.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-primary btn-sm">
-            Generar Carpeta WebControl (PDF / Estandarizado)
+      <section class="drawer-section media-box">
+        <h3 class="drawer-section-title">Archivos del expediente</h3>
+        <p class="drawer-section-desc">Se abren en un visor aislado (sandbox anti-malware).</p>
+        <div class="doc-actions">
+          ${credencialUrl ? `<button type="button" onclick="openSecureDocViewer('${credencialUrl}', 'Credencial Técnica ECF')" class="btn btn-secondary btn-sm">Ver credencial</button>` : ""}
+          ${candidate.cv_file ? `<button type="button" onclick="openSecureDocViewer('${candidate.cv_file}', 'Currículum Vitae (CV)')" class="btn btn-secondary btn-sm">Ver CV</button>` : ""}
+          ${carnetUrl ? `<button type="button" onclick="openSecureDocViewer('${carnetUrl}', 'Cédula de Identidad (Frente)')" class="btn btn-secondary btn-sm">Ver cédula frente</button>` : ""}
+          ${candidate.carnet_back_file ? `<button type="button" onclick="openSecureDocViewer('${candidate.carnet_back_file}', 'Cédula de Identidad (Reverso)')" class="btn btn-secondary btn-sm">Ver cédula reverso</button>` : ""}
+          ${candidate.antecedentes_file ? `<button type="button" onclick="openSecureDocViewer('${candidate.antecedentes_file}', 'Certificado de Antecedentes')" class="btn btn-secondary btn-sm">Ver antecedentes</button>` : ""}
+          <a href="/api/admin/candidates/${candidate.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-secondary btn-sm btn-export">
+            Generar carpeta WebControl (PDF / estandarizado)
           </a>
         </div>
-      </div>
+      </section>
 
       <!-- Acción Operativa de Aprobación de Acceso a Faena (Fase 2) -->
       ${
@@ -605,17 +677,15 @@ document.addEventListener("DOMContentLoaded", () => {
         !candidate.carnet_file &&
         !candidate.access_token
           ? `
-        <div style="background: rgba(255, 184, 0, 0.08); border: 1px solid var(--safety-yellow); padding: 1.15rem; border-radius: var(--radius-terminal); margin-top: 1rem; text-align: left;">
-          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; font-weight: 700; color: var(--safety-yellow); margin-bottom: 0.35rem;">
-            [ACCIÓN DE RR.HH.: AUTORIZAR ACCESO A FAENA]
-          </div>
-          <p style="font-size: 0.82rem; color: var(--text-primary); margin: 0 0 0.85rem 0;">
+        <section class="drawer-section">
+          <h3 class="drawer-section-title">Autorizar acceso a faena</h3>
+          <p class="drawer-section-desc">
             El postulante aprobó la evaluación técnica. Por normativa laboral (Ley N° 19.628), la Fase 2 (Cédula y Antecedentes) permanece bloqueada hasta que RR.HH. autorice el cupo de faena. Al presionar este botón, se emitirá su token de acceso y se le despachará el enlace a su correo electrónico (<strong>${escapeHtml(candidate.email || "correo")}</strong>).
           </p>
-          <button class="btn btn-primary" id="btn-approve-faena" onclick="approveFaena(${candidate.id})" style="width: 100%; justify-content: center;">
-            [ APROBAR ACCESO A FAENA Y ENVIAR ENLACE FASE 2 ]
+          <button type="button" class="btn btn-primary btn-block" id="btn-approve-faena" onclick="approveFaena(${candidate.id})">
+            Aprobar acceso a faena y enviar enlace Fase 2
           </button>
-        </div>
+        </section>
       `
           : ""
       }
@@ -624,12 +694,12 @@ document.addEventListener("DOMContentLoaded", () => {
         candidate.status === "APROBADO_FAENA" ||
         (candidate.access_token && !candidate.carnet_file)
           ? `
-        <div class="modal-token-card">
-          <div class="modal-token-card-header">
-            <span>[ACCESO A FAENA APROBADO // ENLACE FASE 2 ACTIVO]</span>
-            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: var(--ecf-emerald); font-size: 0.72rem; padding: 2px 8px; border-radius: 2px;">VÁLIDO 7 DÍAS</span>
+        <section class="drawer-section modal-token-card">
+          <div class="drawer-section-head modal-token-card-header">
+            <h3 class="drawer-section-title">Acceso a faena aprobado · enlace Fase 2 activo</h3>
+            <span class="badge-code badge-code--ok">Válido 7 días</span>
           </div>
-          <p style="font-size: 0.82rem; color: var(--text-primary); margin: 0 0 0.5rem 0;">
+          <p class="drawer-section-desc">
             El candidato cuenta con autorización de faena activa para cargar su Cédula y Certificado de Antecedentes (Fase 2). Enlace despachado a <strong>${escapeHtml(candidate.email || "correo")}</strong>.
           </p>
           <div class="modal-token-link-box">
@@ -640,35 +710,38 @@ document.addEventListener("DOMContentLoaded", () => {
               candidate.access_token
                 ? `
               <button type="button" class="btn btn-secondary btn-sm" onclick="copyMagicLinkToClipboard('${window.location.origin}/?token=${candidate.access_token}', this)">
-                [ COPIAR ENLACE FASE 2 ]
+                Copiar enlace Fase 2
               </button>
             `
                 : ""
             }
-            <button type="button" class="btn btn-sm" style="border: 1px solid var(--border-structural); color: var(--text-secondary);" id="btn-approve-faena" onclick="approveFaena(${candidate.id})">
-              [ RE-DESPACHAR CORREO ]
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-approve-faena" onclick="approveFaena(${candidate.id})">
+              Re-despachar correo
             </button>
           </div>
-        </div>
+        </section>
       `
           : ""
       }
 
       <!-- Controles de la Máquina de Estados -->
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-top:1rem; padding-top:1rem; border-top: 1px solid var(--border-standard);">
-        <div>
-          <span>Cambiar Estado en Nómina: </span>
+      <section class="drawer-section drawer-decision">
+        <h3 class="drawer-section-title">Cambiar estado en nómina</h3>
+        <div class="decision-row">
+          ${decisionButton("DESCARTADO_TECNICO", "Descartar", "btn-danger")}
+          <div class="decision-positive">
+            ${decisionButton("EN_REVISION_MANUAL", "En revisión manual", "btn-secondary")}
+            ${decisionButton("PRE_ACREDITADO", "Aprobar pre-acreditado", "btn-success")}
+            ${decisionButton("CONTRATADO_FAENA", "Asignar a parada (contratado faena)", "btn-primary")}
+          </div>
         </div>
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-          <button class="btn btn-danger btn-sm" onclick="updateCandidateStatus(${candidate.id}, 'DESCARTADO_TECNICO')">Descartar</button>
-          <button class="btn btn-secondary btn-sm" onclick="updateCandidateStatus(${candidate.id}, 'EN_REVISION_MANUAL')">En Revisión Manual</button>
-          <button class="btn btn-success btn-sm" onclick="updateCandidateStatus(${candidate.id}, 'PRE_ACREDITADO')">Aprobar Pre-Acreditado</button>
-          <button class="btn btn-primary btn-sm" onclick="updateCandidateStatus(${candidate.id}, 'CONTRATADO_FAENA')">Asignar a Parada (Contratado Faena)</button>
-        </div>
-      </div>
+        <p class="visually-hidden" id="decision-current-note">Este es el estado vigente del expediente; no se puede volver a asignar.</p>
+      </section>
     `;
 
     modalCandidate.style.display = "flex";
+    // Lleva el foco al expediente para navegación por teclado.
+    if (btnCloseModal) btnCloseModal.focus({ preventScroll: true });
   };
 
   window.approveFaena = async (id) => {
@@ -685,19 +758,16 @@ document.addEventListener("DOMContentLoaded", () => {
       if (res.ok) {
         if (data.mail_sent) {
           showToast(
-            `[ÉXITO] Acceso autorizado. Correo enviado a ${data.mail_recipient || "postulante"}.`,
+            `Acceso autorizado. Correo enviado a ${data.mail_recipient || "postulante"}.`,
             "success",
           );
         } else if (data.mail_simulated) {
           showToast(
-            `[ACCESO APROBADO] Token generado (Modo simulador consola).`,
+            `Acceso aprobado. Token generado (modo simulador consola).`,
             "warn",
           );
         } else {
-          showToast(
-            `[ÉXITO] Acceso autorizado y Magic Link generado.`,
-            "success",
-          );
+          showToast(`Acceso autorizado y Magic Link generado.`, "success");
         }
         await loadCandidates();
         await loadStats();
@@ -706,14 +776,14 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast(`Error al aprobar acceso a faena: ${data.error}`, "error");
         if (btn) {
           btn.disabled = false;
-          btn.textContent = "[ APROBAR ACCESO A FAENA Y ENVIAR ENLACE FASE 2 ]";
+          btn.textContent = "Aprobar acceso a faena y enviar enlace Fase 2";
         }
       }
     } catch (e) {
       showToast("Error de conexión al aprobar acceso a faena.", "error");
       if (btn) {
         btn.disabled = false;
-        btn.textContent = "[ APROBAR ACCESO A FAENA Y ENVIAR ENLACE FASE 2 ]";
+        btn.textContent = "Aprobar acceso a faena y enviar enlace Fase 2";
       }
     }
   };
@@ -753,18 +823,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (res.ok) {
         if (status === "CONTRATADO_FAENA" && data.mail_sent) {
           showToast(
-            `[CONTRATADO] Estado actualizado y correo de confirmación enviado al postulante.`,
+            `Contratado: estado actualizado y correo de confirmación enviado al postulante.`,
             "success",
           );
         } else if (status === "CONTRATADO_FAENA" && data.mail_simulated) {
           showToast(
-            `[CONTRATADO] Estado actualizado (Correo simulado en consola).`,
+            `Contratado: estado actualizado (correo simulado en consola).`,
             "success",
           );
         } else {
-          showToast(`Estado actualizado a ${status}.`, "success");
+          showToast(`Estado actualizado a ${statusLabel(status)}.`, "success");
         }
         modalCandidate.style.display = "none";
+        lastStatusChangeId = id;
         loadCandidates();
         loadStats();
       } else {
@@ -816,6 +887,29 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Cerrar el panel de expediente al hacer clic en el fondo
+  modalCandidate.addEventListener("click", (e) => {
+    if (e.target === modalCandidate) {
+      modalCandidate.style.display = "none";
+    }
+  });
+
+  // Escape cierra la capa superior abierta (visor de documento, luego expediente)
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (modalDocViewer && modalDocViewer.style.display !== "none") {
+      modalDocViewer.style.display = "none";
+      if (docViewerFrame) docViewerFrame.src = "about:blank";
+    } else if (modalCandidate.style.display !== "none") {
+      modalCandidate.style.display = "none";
+    } else if (
+      notificationDropdown &&
+      notificationDropdown.style.display === "block"
+    ) {
+      notificationDropdown.style.display = "none";
+    }
+  });
 
   filterPosition.addEventListener("change", loadCandidates);
   filterStatus.addEventListener("change", loadCandidates);

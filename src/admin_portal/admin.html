@@ -9,7 +9,7 @@
   <link rel="shortcut icon" href="/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/admin.css">
   <script>
     if (!sessionStorage.getItem('nexxo_admin_token')) {
@@ -18,22 +18,21 @@
   </script>
 </head>
 <body>
+  <a class="skip-link" href="#matriz">Ir a la matriz de postulantes</a>
   <div class="app-layout">
-    <!-- Header institucional idéntico al portal público -->
-    <header class="top-nav">
-      <div class="top-nav-inner">
-        <div class="brand">
-          <a href="/admin" class="brand-link" aria-label="Panel RR.HH. Nexxo S.A.">
-            <img src="/logo-nexxo.png" alt="Nexxo S.A. - Grupo Echeverría Izquierdo" class="brand-logo-img">
-          </a>
-          <span class="brand-divider"></span>
-          <span class="division-tag">Terminal RR.HH. & Pre-Acreditación División El Teniente (WebControl)</span>
-        </div>
-        <div class="nav-links">
+    <!-- Barra superior grafito (mismo sistema que el portal público) -->
+    <header class="shell">
+      <div class="shell-inner">
+        <a href="/admin" class="shell-logo" aria-label="Panel RR.HH. Nexxo S.A.">
+          <img src="/logo-nexxo.png" alt="Nexxo S.A. - Grupo Echeverría Izquierdo" class="shell-logo-img">
+        </a>
+        <span class="shell-context">Panel RR.HH. · Pre-acreditación El Teniente (WebControl)</span>
+
+        <div class="shell-actions">
           <!-- Centro de Notificaciones Fase 2 -->
           <div class="notification-wrapper" id="notification-wrapper">
-            <button type="button" class="btn-icon-bell" id="btn-notifications" aria-label="Notificaciones de Fase 2" title="Alertas de Postulaciones">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <button type="button" class="btn-icon-bell" id="btn-notifications" aria-label="Notificaciones de Fase 2" title="Alertas de postulaciones">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
               </svg>
@@ -41,7 +40,7 @@
             </button>
             <div class="notification-dropdown" id="notification-dropdown" style="display: none;">
               <div class="notification-dropdown-header">
-                <div class="notification-header-title">Alertas de Expedientes Fase 2</div>
+                <div class="notification-header-title">Expedientes Fase 2</div>
                 <span class="notification-header-count" id="notification-header-count">0 pendientes</span>
               </div>
               <div class="notification-dropdown-body" id="notification-list">
@@ -50,122 +49,88 @@
             </div>
           </div>
 
-          <span class="nav-user-badge" id="admin-user-badge">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            [ADMINISTRADOR: RR.HH.]
-          </span>
-          <button id="btn-logout" class="btn btn-logout-admin">Cerrar Sesión</button>
+          <span class="nav-user-badge" id="admin-user-badge">Administrador RR.HH.</span>
+          <button type="button" id="btn-logout" class="btn btn-sm btn-on-dark btn-logout-admin">Cerrar sesión</button>
         </div>
       </div>
-      <!-- Franja de seguridad bajo el header -->
-      <div class="hazard-stripe"></div>
     </header>
 
-    <!-- Hero blanco institucional -->
-    <section class="portal-hero">
-      <div class="hero-inner">
-        <div class="hero-chips">
-          <span class="chip chip-accent">
-            <span class="chip-dot"></span>
-            FASE 04: AUDITORÍA NORMATIVA &amp; MATRIZ WEBCONTROL (CODELCO)
-          </span>
-          <span class="chip chip-muted">División El Teniente</span>
+    <main class="main-container" id="matriz">
+      <!-- Encabezado de página -->
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Matriz de postulantes</h1>
+          <p class="page-subtitle">
+            Auditoría por excepción de los casos <span class="status-pill status-EN_REVISION_MANUAL">En revisión manual</span> y exportación de carpetas conformes para ingreso a faena bajo estándar ECF Codelco y DS N° 132.
+          </p>
         </div>
-        <h1 class="hero-title">Matriz de Auditoría Técnica &amp; Validación Cruzada OCR</h1>
-        <p class="hero-subtitle">
-          Supervisión técnica por excepción: RR.HH. audita discrepancias en expedientes <code>EN_REVISION_MANUAL</code> y exporta carpetas técnicas conformes para ingreso a faena minera bajo estándar ECF Codelco y DS N° 132.
-        </p>
+        <button type="button" class="btn btn-secondary" id="btn-refresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Actualizar matriz
+        </button>
       </div>
-    </section>
 
-    <main class="main-container full-width">
       <!-- Métricas de Impacto Operativo y Económico -->
-      <section class="metrics-grid">
-        <div class="metric-card">
-          <div class="metric-header">
-            <span class="metric-label">TOTAL POSTULACIONES</span>
-            <span class="metric-badge">OCR</span>
-          </div>
+      <section class="metrics-strip" aria-label="Indicadores de la matriz">
+        <div class="metric-cell metric-cell--neutral">
+          <span class="metric-label">Total postulaciones</span>
           <span class="metric-value" id="metric-total">0</span>
           <span class="metric-desc">Expedientes procesados por OCR</span>
         </div>
 
-        <div class="metric-card metric-success">
-          <div class="metric-header">
-            <span class="metric-label">PRE-ACREDITADOS / NÓMINA</span>
-            <span class="metric-badge metric-badge-success">CONFORME</span>
-          </div>
+        <div class="metric-cell metric-cell--ok">
+          <span class="metric-label">Pre-acreditados / nómina</span>
           <span class="metric-value" id="metric-approved">0</span>
           <span class="metric-desc">Listos para exportación WebControl</span>
         </div>
 
-        <div class="metric-card metric-warning">
-          <div class="metric-header">
-            <span class="metric-label">EN REVISIÓN MANUAL</span>
-            <span class="metric-badge metric-badge-warning">AUDITORÍA</span>
-          </div>
+        <div class="metric-cell metric-cell--warn">
+          <span class="metric-label">En revisión manual</span>
           <span class="metric-value" id="metric-review">0</span>
-          <span class="metric-desc">Postulaciones derivadas a revisión o auditoría</span>
+          <span class="metric-desc">Derivadas a revisión o auditoría</span>
         </div>
 
-        <div class="metric-card metric-danger">
-          <div class="metric-header">
-            <span class="metric-label">DESCARTADOS TÉCNICOS</span>
-            <span class="metric-badge metric-badge-danger">FILTRO ECF</span>
-          </div>
+        <div class="metric-cell metric-cell--danger">
+          <span class="metric-label">Descartados técnicos</span>
           <span class="metric-value" id="metric-rejected">0</span>
           <span class="metric-desc">No conformes con ECF / Test &lt; 80%</span>
         </div>
 
-        <div class="metric-card metric-savings">
-          <div class="metric-header">
-            <span class="metric-label">GASTO HUNDIDO EVITADO</span>
-            <span class="metric-badge metric-badge-accent">EFICIENCIA</span>
-          </div>
+        <div class="metric-cell metric-cell--neutral metric-savings">
+          <span class="metric-label">Gasto hundido evitado</span>
           <span class="metric-value" id="metric-savings">$0 CLP</span>
           <span class="metric-desc">Ahorro en acreditaciones fallidas</span>
         </div>
       </section>
 
       <!-- Filtros y Matriz de Auditoría -->
-      <section class="card admin-card">
-        <div class="table-header-tools">
-          <div>
-            <div class="table-card-tag">[MATRIZ SCADA DE POSTULACIONES // ESTADOS EN TIEMPO REAL]</div>
-            <h2 class="table-card-title">Tubería de Postulantes (State Machine)</h2>
-          </div>
-          
+      <section class="matrix-panel" aria-labelledby="matrix-title">
+        <div class="matrix-toolbar">
+          <h2 class="matrix-title" id="matrix-title">Postulantes</h2>
+
           <div class="filters-bar">
             <div class="filter-group">
-              <label for="filter-position">Especialidad:</label>
+              <label for="filter-position">Especialidad</label>
               <select id="filter-position">
                 <option value="">Todas las especialidades</option>
               </select>
             </div>
 
             <div class="filter-group">
-              <label for="filter-status">Estado:</label>
+              <label for="filter-status">Estado</label>
               <select id="filter-status">
                 <option value="">Todos los estados</option>
-                <option value="PRE_ACREDITADO">PRE_ACREDITADO (Listo WebControl)</option>
-                <option value="EN_REVISION_MANUAL">EN_REVISION_MANUAL (Auditar OCR)</option>
-                <option value="PRESELECCIONADO">PRESELECCIONADO (Esperando Fase 2)</option>
-                <option value="CONTRATADO_FAENA">CONTRATADO_FAENA (En Nómina)</option>
-                <option value="DESCARTADO_TECNICO">DESCARTADO_TECNICO (Filtro ECF)</option>
+                <option value="PRE_ACREDITADO">Pre-acreditado (listo WebControl)</option>
+                <option value="EN_REVISION_MANUAL">En revisión manual (auditar OCR)</option>
+                <option value="PRESELECCIONADO">Preseleccionado (esperando Fase 2)</option>
+                <option value="CONTRATADO_FAENA">Contratado faena (en nómina)</option>
+                <option value="DESCARTADO_TECNICO">Descartado técnico (filtro ECF)</option>
               </select>
             </div>
-
-            <button class="btn btn-secondary" id="btn-refresh">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
-                <path d="M23 4v6h-6"></path>
-                <path d="M1 20v-6h6"></path>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-              </svg>
-              Actualizar Matriz
-            </button>
           </div>
         </div>
 
@@ -179,20 +144,20 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>FOLIO</th>
-                <th>POSTULANTE</th>
-                <th>RUT</th>
-                <th>EXP. EFECTIVA</th>
-                <th>ESPECIALIDAD (ECF)</th>
-                <th>MINI-TEST</th>
-                <th>CRUCE OCR / BIOMETRÍA</th>
-                <th>ESTADO NORMATIVO</th>
-                <th>OPERACIÓN / WEBCONTROL</th>
+                <th scope="col">Folio</th>
+                <th scope="col">Postulante</th>
+                <th scope="col">RUT</th>
+                <th scope="col">Exp. efectiva</th>
+                <th scope="col">Especialidad (ECF)</th>
+                <th scope="col">Mini-test</th>
+                <th scope="col">Cruce OCR / biometría</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody id="candidates-tbody">
               <tr>
-                <td colspan="9" class="loading-td">Cargando matriz de postulaciones desde MySQL...</td>
+                <td colspan="9" class="loading-td loading-td--busy">Cargando matriz de postulaciones…</td>
               </tr>
             </tbody>
           </table>
@@ -200,38 +165,54 @@
       </section>
     </main>
 
-    <!-- Modal Detalle y Auditoría Cruzada -->
-    <div class="modal-backdrop" id="modal-candidate" style="display:none;">
-      <div class="modal-box">
-        <button type="button" class="modal-close" id="btn-close-modal" aria-label="Cerrar modal">&times;</button>
-        <div class="modal-top-chip">[EXPEDIENTE TÉCNICO INDIVIDUAL]</div>
-        <h2 id="modal-title" class="modal-header-title">Expediente del Postulante</h2>
+    <!-- Panel lateral: Detalle y Auditoría Cruzada (la matriz sigue visible) -->
+    <div class="modal-backdrop modal-backdrop--drawer" id="modal-candidate" style="display:none;">
+      <div class="modal-box drawer" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="drawer-head">
+          <h2 id="modal-title" class="modal-header-title">Expediente del postulante</h2>
+          <button type="button" class="modal-close" id="btn-close-modal" aria-label="Cerrar expediente">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
 
-        <div class="modal-content-grid" id="modal-body">
+        <div class="drawer-body modal-content-grid" id="modal-body">
           <!-- Detalle inyectado por JS -->
         </div>
       </div>
     </div>
 
     <!-- Modal de Previsualización Segura de Documentos (Sandbox Anti-Malware) -->
-    <div class="modal-backdrop" id="modal-doc-viewer" style="display:none; z-index: 1100;">
-      <div class="modal-box" style="max-width: 920px; width: 95%;">
-        <button type="button" class="modal-close" id="btn-close-doc-modal" aria-label="Cerrar visor">&times;</button>
-        <div class="modal-top-chip">[VISOR AISLADO // SANDBOX ANTI-MALWARE]</div>
-        <h2 id="doc-modal-title" class="modal-header-title">Visualización Segura de Documento</h2>
-        <div style="margin-top: 1rem;">
-          <iframe id="doc-viewer-frame" sandbox="allow-scripts allow-same-origin" style="width: 100%; height: 550px; border: 1px solid var(--border); border-radius: 4px; background: #fff;"></iframe>
+    <div class="modal-backdrop modal-backdrop--doc" id="modal-doc-viewer" style="display:none;">
+      <div class="modal-box doc-viewer" role="dialog" aria-modal="true" aria-labelledby="doc-modal-title">
+        <div class="doc-viewer-head">
+          <h2 id="doc-modal-title" class="modal-header-title">Visualización segura de documento</h2>
+          <button type="button" class="modal-close" id="btn-close-doc-modal" aria-label="Cerrar visor">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
-        <div style="margin-top: 0.85rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: var(--text-muted); flex-wrap: wrap; gap: 0.5rem;">
-          <span>[Seguridad] Documento protegido: Renderizado en sandbox sin ejecución de código local.</span>
-          <a id="doc-modal-download" href="#" target="_blank" class="btn btn-secondary btn-sm">Descargar Documento Original</a>
+        <iframe id="doc-viewer-frame" class="doc-viewer-frame" title="Documento del expediente" sandbox="allow-scripts allow-same-origin"></iframe>
+        <div class="doc-viewer-foot">
+          <p class="doc-viewer-note">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <span>Documento protegido: renderizado en sandbox sin ejecución de código local.</span>
+          </p>
+          <a id="doc-modal-download" href="#" target="_blank" class="btn btn-secondary btn-sm">Descargar documento original</a>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Contenedor Flotante de Notificaciones Toast Industriales -->
-  <div id="toast-container" class="toast-container"></div>
+  <!-- Contenedor Flotante de Notificaciones Toast -->
+  <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
 
   <script src="/admin.js"></script>
 </body>

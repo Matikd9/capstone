@@ -9,62 +9,59 @@
   <link rel="shortcut icon" href="/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/admin.css">
 </head>
 <body class="login-body">
-
-  <header class="top-nav">
-    <div class="top-nav-inner">
-      <div class="brand">
-        <a href="/" class="brand-link" aria-label="Inicio Nexxo S.A.">
-          <img src="/logo-nexxo.png" alt="Nexxo S.A. - Grupo Echeverría Izquierdo" class="brand-logo-img">
-        </a>
-        <span class="brand-divider"></span>
-        <span class="division-tag">Terminal RR.HH. & Pre-Acreditación División El Teniente (WebControl)</span>
+  <div class="login-split">
+    <!-- Panel grafito institucional -->
+    <aside class="login-brand">
+      <a href="/" class="shell-logo" aria-label="Inicio Nexxo S.A.">
+        <img src="/logo-nexxo.png" alt="Nexxo S.A. - Grupo Echeverría Izquierdo" class="shell-logo-img">
+      </a>
+      <div class="login-brand-body">
+        <p class="login-brand-title">Panel RR.HH. Nexxo</p>
+        <p class="login-brand-context">Pre-acreditación División El Teniente (WebControl)</p>
       </div>
-      <div class="nav-links">
-        <a href="/" class="nav-link-help">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <p class="security-notice">
+        <strong>Acceso restringido.</strong> El uso de este sistema está reservado exclusivamente al personal autorizado de RR.HH. de Nexxo S.A. Todo intento no autorizado es registrado y auditado conforme a la Ley N° 19.628 y políticas corporativas de Codelco.
+      </p>
+    </aside>
+
+    <!-- Formulario de acceso -->
+    <main class="login-main">
+      <div class="login-card">
+        <a href="/" class="login-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M15 18l-6-6 6-6"/>
           </svg>
-          <span>Volver al Portal Público</span>
+          <span>Volver al portal público</span>
         </a>
-      </div>
-    </div>
-    <div class="hazard-stripe"></div>
-  </header>
 
-  <div class="login-wrapper">
-    <div class="login-card">
-      <div class="login-header">
-        <div class="login-chip-badge">SISTEMA PRIVADO DE GESTIÓN RR.HH.</div>
-        <h1 class="login-title">Acceso a Matriz WebControl</h1>
-        <p class="login-subtitle">Autenticación requerida para evaluadores técnicos y supervisión de faena</p>
-      </div>
-
-      <div id="login-error" class="error-banner" style="display: none;"></div>
-
-      <form id="form-login">
-        <div class="form-group">
-          <label for="username">Usuario Corporativo</label>
-          <input type="text" id="username" name="username" required autocomplete="username" autofocus placeholder="admin">
+        <div class="login-header">
+          <h1 class="login-title">Acceso a Matriz WebControl</h1>
+          <p class="login-subtitle">Autenticación requerida para evaluadores técnicos y supervisión de faena.</p>
         </div>
 
-        <div class="form-group">
-          <label for="password">Contraseña</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
-        </div>
+        <div id="login-error" class="error-banner" role="alert" style="display: none;"></div>
 
-        <button type="submit" id="btn-submit" class="btn btn-primary btn-login">
-          Ingresar al Panel
-        </button>
-      </form>
+        <form id="form-login" class="login-form">
+          <div class="form-group">
+            <label for="username">Usuario corporativo</label>
+            <input type="text" id="username" name="username" required autocomplete="username" autofocus placeholder="admin">
+          </div>
 
-      <div class="security-notice">
-        <strong>ACCESO RESTRINGIDO:</strong> El uso de este sistema está reservado exclusivamente al personal autorizado de RR.HH. de Nexxo S.A. Todo intento no autorizado es registrado y auditado conforme a la Ley N° 19.628 y políticas corporativas de Codelco.
+          <div class="form-group">
+            <label for="password">Contraseña</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+          </div>
+
+          <button type="submit" id="btn-submit" class="btn btn-primary btn-login">
+            Ingresar al Panel
+          </button>
+        </form>
       </div>
-    </div>
+    </main>
   </div>
 
   <script>
@@ -122,7 +119,7 @@
         // Redireccionar al panel de administración
         window.location.replace('/admin');
       } catch (err) {
-        errorBanner.textContent = '[ERROR DE ACCESO] ' + err.message;
+        errorBanner.textContent = 'No se pudo ingresar: ' + err.message;
         errorBanner.style.display = 'block';
         btnSubmit.disabled = false;
         btnSubmit.textContent = 'Ingresar al Panel';

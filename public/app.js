@@ -335,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!isMimeValid && !isExtValid) {
         resetToEmpty();
         showError(
-          "[ERROR DE FORMATO]: Solo se admiten archivos PDF, DOCX, JPG o PNG",
+          "Formato no admitido: solo se aceptan archivos PDF, DOCX, JPG o PNG",
         );
         return;
       }
@@ -344,7 +344,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (file.size > maxBytes) {
         resetToEmpty();
         showError(
-          `[ERROR DE TAMAÑO]: Excede el límite de ${maxSizeMB}MB (${formatFileSize(file.size)})`,
+          `Archivo demasiado grande: excede el límite de ${maxSizeMB}MB (${formatFileSize(file.size)})`,
         );
         return;
       }
@@ -1025,12 +1025,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const isSjt = q.category === "SJT";
     const catHtml = isSjt
-      ? `<span class="mining-tag" style="background: rgba(255, 184, 0, 0.15); color: var(--safety-yellow); border-color: var(--safety-yellow); margin-bottom: 0.5rem; display: inline-block;">[CASO SJT: SEGURIDAD CRÍTICA / ECF CODELCO]</span><br>`
-      : `<span class="mining-tag" style="color: var(--text-secondary); margin-bottom: 0.5rem; display: inline-block;">[IDONEIDAD TÉCNICA ESPECÍFICA]</span><br>`;
+      ? `<span class="question-category">Caso SJT · Seguridad crítica ECF Codelco</span>`
+      : `<span class="question-category">Idoneidad técnica específica</span>`;
 
     const progressEl = document.querySelector(".question-progress");
     if (progressEl) {
-      progressEl.innerHTML = `${catHtml}Pregunta ${index + 1} de ${state.questions.length}`;
+      progressEl.innerHTML = `<span>Pregunta <strong id="q-current">${index + 1}</strong> de <strong id="q-total">${state.questions.length}</strong></span><span class="question-progress-sep" aria-hidden="true">·</span>${catHtml}`;
     }
 
     optionsContainer.innerHTML = [
@@ -1042,7 +1042,8 @@ document.addEventListener("DOMContentLoaded", () => {
       .map(
         (opt) => `
       <button type="button" class="option-btn" data-key="${opt.key}">
-        <strong>${opt.key})</strong> ${opt.text}
+        <span class="option-key">${opt.key}</span>
+        <span class="option-text">${opt.text}</span>
       </button>
     `,
       )
@@ -1151,28 +1152,28 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             <div class="info-item">
               <span class="label">Score Técnico</span>
-              <span class="value">[${data.score_tecnico}/3]</span>
+              <span class="value">${data.score_tecnico}/3</span>
             </div>
             <div class="info-item">
               <span class="label">Índice Conductual ECF</span>
-              <span class="value" style="color: var(--ecf-emerald); font-weight: 800;">
-                [CONFORME (2/2)]
-              </span>
+              <span class="value value--ok">Conforme (2/2)</span>
             </div>
             <div class="info-item">
               <span class="label">Veredicto Técnico</span>
-              <span class="status-pill status-Aprobado">[PRESELECCIONADO]</span>
+              <span class="status-pill status-Aprobado">PRESELECCIONADO</span>
             </div>
           </div>
 
-          <div style="margin-top: 1.25rem; text-align: left; background: var(--surface-panel); border: 1px solid var(--safety-yellow); border-left: 4px solid var(--safety-yellow); color: var(--text-primary); padding: 1.25rem; border-radius: var(--radius-terminal); font-size: 0.88rem; font-family: 'IBM Plex Mono', monospace;">
-            <strong style="color: var(--safety-yellow);">ETAPA ACTUAL: ASIGNACIÓN DE DOTACIÓN POR RR.HH.</strong><br><br>
-            Ha calificado técnicamente para la parada de planta en <strong>División El Teniente</strong>.<br><br>
-            <strong>Próximos Pasos Normativos:</strong><br>
-            1. El equipo de Reclutamiento y Acreditación de Nexxo S.A. validará los cupos de dotación disponibles.<br>
-            2. Una vez <strong>aprobado su acceso a faena</strong>, recibirá automáticamente un <strong>enlace de acceso seguro (Magic Link)</strong> en su correo electrónico (<strong>${state.candidateData.email || "declarado"}</strong>).<br>
-            3. Mediante ese enlace exclusivo podrá ingresar a la <strong>Fase 02 (Validación Documental)</strong> para adjuntar su Cédula de Identidad y Certificado de Antecedentes (Vigencia &le; 60 días).<br><br>
-            <em>En estricto cumplimiento de la Ley N° 19.628 y la normativa laboral de la Dirección del Trabajo, su documentación penal no es requerida hasta que cuente con aprobación formal de cupo de faena.</em>
+          <div class="result-note result-note--info">
+            <strong class="result-note-title">Etapa actual: asignación de dotación por RR.HH.</strong>
+            <p>Ha calificado técnicamente para la parada de planta en <strong>División El Teniente</strong>.</p>
+            <p><strong>Próximos pasos normativos:</strong></p>
+            <ol class="result-steps">
+              <li>El equipo de Reclutamiento y Acreditación de Nexxo S.A. validará los cupos de dotación disponibles.</li>
+              <li>Una vez <strong>aprobado su acceso a faena</strong>, recibirá automáticamente un <strong>enlace de acceso seguro (Magic Link)</strong> en su correo electrónico (<strong>${state.candidateData.email || "declarado"}</strong>).</li>
+              <li>Mediante ese enlace exclusivo podrá ingresar a la <strong>Fase 02 (Validación Documental)</strong> para adjuntar su Cédula de Identidad y Certificado de Antecedentes (Vigencia &le; 60 días).</li>
+            </ol>
+            <p><em>En estricto cumplimiento de la Ley N° 19.628 y la normativa laboral de la Dirección del Trabajo, su documentación penal no es requerida hasta que cuente con aprobación formal de cupo de faena.</em></p>
           </div>
         `;
         goToStep(4);
@@ -1192,24 +1193,26 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             <div class="info-item">
               <span class="label">Score Técnico</span>
-              <span class="value">[${data.score_tecnico}/3]</span>
+              <span class="value">${data.score_tecnico}/3</span>
             </div>
             <div class="info-item">
               <span class="label">Índice Conductual ECF</span>
-              <span class="value" style="color: ${data.sjt_conforme ? "var(--ecf-emerald)" : "var(--ecf-crimson)"}; font-weight: 800;">
-                [${data.sjt_conforme ? "CONFORME (2/2)" : "NO CONFORME"}]
+              <span class="value ${data.sjt_conforme ? "value--ok" : "value--danger"}">
+                ${data.sjt_conforme ? "Conforme (2/2)" : "No conforme"}
               </span>
             </div>
             <div class="info-item">
               <span class="label">Veredicto Final</span>
-              <span class="status-pill status-Rechazado">[${data.status}]</span>
+              <span class="status-pill status-Rechazado">${data.status}</span>
             </div>
           </div>
-          <div style="margin-top: 1.25rem; text-align: left; background: var(--surface-panel); border: 1px solid var(--ecf-crimson-border); border-left: 4px solid var(--ecf-crimson); color: var(--text-primary); padding: 1rem; border-radius: var(--radius-terminal); font-size: 0.88rem; font-family: 'IBM Plex Mono', monospace;">
-            <strong style="color: var(--ecf-crimson);">DIAGNÓSTICO DEL DESCARTE AUTOMÁTICO:</strong><br>
-            ${(data.rejectionReasons || []).map((r) => `• ${r}`).join("<br>")}
+          <div class="result-note result-note--danger">
+            <strong class="result-note-title">Diagnóstico del descarte automático</strong>
+            <ul class="result-reasons">
+              ${(data.rejectionReasons || []).map((r) => `<li>${r}</li>`).join("")}
+            </ul>
           </div>
-          <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.82rem; font-family: 'IBM Plex Mono', monospace;">
+          <p class="result-legal">
             En estricto cumplimiento de la normativa laboral (Dirección del Trabajo y Ley N° 19.628), no se le ha solicitado Cédula de Identidad ni Certificado de Antecedentes Penales.
           </p>
         `;
@@ -1234,8 +1237,7 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     onFileCleared: () => {
       state.carnetFrontBase64 = null;
-      carnetFrontStatus.textContent =
-        "[ESCANEO: Valida RUT, Nombre y Vigencia]";
+      carnetFrontStatus.textContent = "Valida RUT, Nombre y Vigencia";
       carnetFrontStatus.style.color = "";
     },
   });
@@ -1250,7 +1252,7 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     onFileCleared: () => {
       state.carnetBackBase64 = null;
-      carnetBackStatus.textContent = "[ESCANEO: Reverso del documento]";
+      carnetBackStatus.textContent = "Reverso del documento";
       carnetBackStatus.style.color = "";
     },
   });
@@ -1265,7 +1267,7 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     onFileCleared: () => {
       state.antecedentesBase64 = null;
-      antecedentesStatus.textContent = "[REGISTRO CIVIL: Vigencia ≤ 60 días]";
+      antecedentesStatus.textContent = "Registro Civil: vigencia ≤ 60 días";
       antecedentesStatus.style.color = "";
     },
   });
@@ -1348,13 +1350,13 @@ document.addEventListener("DOMContentLoaded", () => {
         ${
           data.discrepancies && data.discrepancies.length > 0
             ? `
-          <div style="margin-top: 1.25rem; text-align: left; background: var(--status-warning-bg); border: 1px solid var(--status-warning-border); color: var(--status-warning-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.88rem;">
+          <div class="result-note result-note--warn">
             <strong>Observación para mesa de selección Nexxo:</strong><br>
             ${data.discrepancies.join("<br>")}
           </div>
         `
             : `
-          <div style="margin-top: 1.25rem; text-align: left; background: var(--status-normal-bg); border: 1px solid var(--status-normal-border); color: var(--status-normal-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.88rem;">
+          <div class="result-note result-note--ok">
             <strong>Validación de Identidad Conforme:</strong> El RUT y Nombre de su Cédula coinciden con sus antecedentes y especialidad técnica.
           </div>
         `
@@ -1466,13 +1468,13 @@ document.addEventListener("DOMContentLoaded", () => {
           ${
             data.discrepancy_notes && data.status === "EN_REVISION_MANUAL"
               ? `
-            <div style="margin-top: 1.25rem; text-align: left; background: var(--status-warning-bg); border: 1px solid var(--status-warning-border); color: var(--status-warning-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.88rem;">
+            <div class="result-note result-note--warn">
               <strong>Observación para mesa de selección Nexxo:</strong><br>
               ${escapeHtml(data.discrepancy_notes)}
             </div>
           `
               : `
-            <div style="margin-top: 1.25rem; text-align: left; background: var(--status-normal-bg); border: 1px solid var(--status-normal-border); color: var(--status-normal-text); padding: 1rem; border-radius: var(--radius-standard); font-size: 0.88rem;">
+            <div class="result-note result-note--ok">
               <strong>Expediente Registrado:</strong> Su información y antecedentes personales se encuentran debidamente resguardados bajo la Ley N° 19.628 para fines de acreditación minera.
             </div>
           `
@@ -1483,10 +1485,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Actualizar encabezado de Fase 2
       phase1ScoreBadge.innerHTML = `
-        Postulante: <strong>${data.full_name}</strong> | 
-        RUT: <strong>${data.rut_id}</strong> | 
-        Cargo: <strong>${data.position_name}</strong> | 
-        Autorización: <strong style="color: var(--ecf-emerald);">[ACCESO A FAENA APROBADO]</strong>
+        <span>Postulante: <strong>${data.full_name}</strong></span>
+        <span>RUT: <strong>${data.rut_id}</strong></span>
+        <span>Cargo: <strong>${data.position_name}</strong></span>
+        <span>Autorización: <strong class="text-ok">Acceso a faena aprobado</strong></span>
       `;
 
       // Navegar a Fase 2 (Step 3)
@@ -1497,7 +1499,7 @@ document.addEventListener("DOMContentLoaded", () => {
       bannerContainer.className = "ocr-banner ocr-banner-done";
       bannerContainer.style.marginBottom = "1.25rem";
       bannerContainer.innerHTML = `
-        <strong style="font-family: 'IBM Plex Mono', monospace;">[ACCESO A FAENA APROBADO]</strong>
+        <strong>Acceso a faena aprobado</strong>
         <span>Bienvenido/a <strong>${data.full_name}</strong>. Su cupo ha sido autorizado por RR.HH. Ingrese su Cédula y Certificado de Antecedentes para conformar su Carpeta WebControl Codelco.</span>
       `;
 
@@ -1515,7 +1517,7 @@ document.addEventListener("DOMContentLoaded", () => {
         adminWarningBanner.className = "ocr-banner ocr-banner-warning";
         adminWarningBanner.style.marginBottom = "1.25rem";
         adminWarningBanner.innerHTML = `
-          <strong style="font-family: 'IBM Plex Mono', monospace;">[MODO SUPERVISIÓN ADMINISTRATIVA]</strong>
+          <strong>Modo supervisión administrativa</strong>
           <span>Ha ingresado con una sesión activa de Administrador. Por trazabilidad legal y transparencia (Ley N° 19.628), un evaluador no puede cargar antecedentes en nombre del postulante. La carga de archivos ha sido inhabilitada.</span>
         `;
         if (formPhase2El && formPhase2El.parentNode) {
@@ -1530,7 +1532,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (btnSubmitPhase2) {
           btnSubmitPhase2.disabled = true;
           btnSubmitPhase2.textContent =
-            "[CARGA INHABILITADA PARA ADMINISTRADORES]";
+            "Carga inhabilitada para administradores";
           btnSubmitPhase2.style.opacity = "0.6";
           btnSubmitPhase2.style.cursor = "not-allowed";
         }

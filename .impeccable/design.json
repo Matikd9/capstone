@@ -1,0 +1,736 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T16:48:45.728Z",
+  "title": "Design System: Nexxo Postulación El Teniente",
+  "extensions": {
+    "colorMeta": {
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#1c232d",
+        "cssVar": "--ink",
+        "tonalRamp": [
+          "#202731",
+          "#40454e",
+          "#5f646b",
+          "#7f8288",
+          "#9ea1a5",
+          "#bdbfc2",
+          "#dadbdd",
+          "#f2f2f3"
+        ]
+      },
+      "graphite-raised": {
+        "role": "neutral",
+        "displayName": "Raised Graphite",
+        "canonical": "#2a3340",
+        "cssVar": "--ink-2",
+        "tonalRamp": [
+          "#202731",
+          "#3e4652",
+          "#5d646e",
+          "#7d838b",
+          "#9da1a7",
+          "#bdc0c4",
+          "#dadbde",
+          "#f2f2f3"
+        ]
+      },
+      "shell-line": {
+        "role": "neutral",
+        "displayName": "Shell Hairline",
+        "canonical": "#3d4757",
+        "cssVar": "--shell-line",
+        "tonalRamp": [
+          "#212731",
+          "#3d4757",
+          "#5c6472",
+          "#7c838e",
+          "#9ca1a9",
+          "#bcc0c5",
+          "#dadbdf",
+          "#f2f2f3"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Text",
+        "canonical": "#4a5562",
+        "cssVar": "--text-2",
+        "tonalRamp": [
+          "#21272f",
+          "#3d4651",
+          "#5b6571",
+          "#7b838d",
+          "#9ba1a9",
+          "#bcc0c5",
+          "#d9dcde",
+          "#f2f2f3"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "canonical": "#626c78",
+        "cssVar": "--text-3",
+        "tonalRamp": [
+          "#22272e",
+          "#3e464f",
+          "#5b6570",
+          "#7b838d",
+          "#9ba1a9",
+          "#bbc0c5",
+          "#d9dcde",
+          "#f1f2f3"
+        ]
+      },
+      "cold-ground": {
+        "role": "neutral",
+        "displayName": "Cold Ground",
+        "canonical": "#eef0f2",
+        "cssVar": "--ground",
+        "tonalRamp": [
+          "#23272c",
+          "#42454a",
+          "#616468",
+          "#7f8286",
+          "#9ea1a4",
+          "#bdc0c2",
+          "#d9dcde",
+          "#eef0f2"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface White",
+        "canonical": "#ffffff",
+        "cssVar": "--surface",
+        "tonalRamp": [
+          "#23272c",
+          "#42454a",
+          "#616468",
+          "#808285",
+          "#9fa1a3",
+          "#bebfc1",
+          "#dbdbdc",
+          "#f2f2f3"
+        ]
+      },
+      "surface-sunken": {
+        "role": "neutral",
+        "displayName": "Sunken Surface",
+        "canonical": "#f6f7f8",
+        "cssVar": "--surface-2",
+        "tonalRamp": [
+          "#23272c",
+          "#42454a",
+          "#616468",
+          "#808286",
+          "#9fa1a4",
+          "#bebfc2",
+          "#dadbdd",
+          "#f1f2f3"
+        ]
+      },
+      "surface-recessed": {
+        "role": "neutral",
+        "displayName": "Recessed Surface",
+        "canonical": "#e9ecef",
+        "cssVar": "--surface-3",
+        "tonalRamp": [
+          "#23272c",
+          "#41454b",
+          "#606469",
+          "#7f8287",
+          "#9ea1a5",
+          "#bcc0c3",
+          "#d9dcdf",
+          "#f1f3f4"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#d5d9de",
+        "cssVar": "--line",
+        "tonalRamp": [
+          "#23272d",
+          "#41454b",
+          "#606469",
+          "#7f8388",
+          "#9da1a6",
+          "#bcc0c5",
+          "#d8dce0",
+          "#f1f2f4"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "#b4bcc5",
+        "cssVar": "--line-strong",
+        "tonalRamp": [
+          "#22272d",
+          "#40454c",
+          "#5e646c",
+          "#7c838b",
+          "#9aa2aa",
+          "#b9c0c9",
+          "#d8dce1",
+          "#f1f2f4"
+        ]
+      },
+      "hivis": {
+        "role": "primary",
+        "displayName": "Fluorescent Hi-Vis Orange",
+        "canonical": "#ff6a13",
+        "cssVar": "--hivis",
+        "tonalRamp": [
+          "#382219",
+          "#793a17",
+          "#bb5115",
+          "#ff6a13",
+          "#ff8d4b",
+          "#ffb285",
+          "#ffd4bb",
+          "#fff0e7"
+        ]
+      },
+      "hivis-deep": {
+        "role": "primary",
+        "displayName": "Pressed Hi-Vis",
+        "canonical": "#e05a0a",
+        "cssVar": "--hivis-deep",
+        "tonalRamp": [
+          "#3a2217",
+          "#7e3912",
+          "#c2500c",
+          "#e46e28",
+          "#ea925d",
+          "#f1b591",
+          "#f7d6c2",
+          "#fcf0e9"
+        ]
+      },
+      "hivis-tint": {
+        "role": "primary",
+        "displayName": "Hi-Vis Wash",
+        "canonical": "#fff1e8",
+        "cssVar": "--hivis-tint",
+        "tonalRamp": [
+          "#24262b",
+          "#454547",
+          "#656364",
+          "#868180",
+          "#a79f9c",
+          "#c7beb8",
+          "#e5d9d2",
+          "#fff1e8"
+        ]
+      },
+      "reflect": {
+        "role": "secondary",
+        "displayName": "Retroreflective Silver",
+        "canonical": "#c7ccd2",
+        "cssVar": "--reflect",
+        "tonalRamp": [
+          "#23272d",
+          "#41454b",
+          "#60646a",
+          "#7e8389",
+          "#9ca1a7",
+          "#bbc0c6",
+          "#d8dce0",
+          "#f1f2f4"
+        ]
+      },
+      "reflect-hi": {
+        "role": "secondary",
+        "displayName": "Silver Highlight",
+        "canonical": "#eef1f4",
+        "cssVar": "--reflect-hi",
+        "tonalRamp": [
+          "#23272c",
+          "#41454b",
+          "#606469",
+          "#7f8287",
+          "#9ea1a5",
+          "#bcc0c3",
+          "#d9dcdf",
+          "#eef1f4"
+        ]
+      },
+      "reflect-dim": {
+        "role": "secondary",
+        "displayName": "Dim Silver",
+        "canonical": "#9aa3ad",
+        "cssVar": "--reflect-dim",
+        "tonalRamp": [
+          "#22272d",
+          "#40464d",
+          "#5d646d",
+          "#7b838c",
+          "#9aa3ad",
+          "#bac0c7",
+          "#d8dce0",
+          "#f1f2f4"
+        ]
+      },
+      "ok": {
+        "role": "tertiary",
+        "displayName": "Conforme Green",
+        "canonical": "#1f7a48",
+        "cssVar": "--ok",
+        "tonalRamp": [
+          "#142c25",
+          "#195337",
+          "#1f7a48",
+          "#4c946c",
+          "#77af90",
+          "#a3c9b4",
+          "#cce1d5",
+          "#edf4f0"
+        ]
+      },
+      "ok-tint": {
+        "role": "tertiary",
+        "displayName": "Conforme Tint",
+        "canonical": "#e7f4ec",
+        "cssVar": "--ok-tint",
+        "tonalRamp": [
+          "#22272c",
+          "#404649",
+          "#5e6566",
+          "#7b8483",
+          "#99a3a0",
+          "#b7c2bd",
+          "#d2ded8",
+          "#e7f4ec"
+        ]
+      },
+      "ok-line": {
+        "role": "tertiary",
+        "displayName": "Conforme Line",
+        "canonical": "#9fd1b3",
+        "cssVar": "--ok-line",
+        "tonalRamp": [
+          "#1f282a",
+          "#384945",
+          "#51695f",
+          "#698a7a",
+          "#82ab94",
+          "#9bccaf",
+          "#c5e3d1",
+          "#eaf5ef"
+        ]
+      },
+      "ok-on-dark": {
+        "role": "tertiary",
+        "displayName": "Conforme on Graphite",
+        "canonical": "#86d6a6",
+        "cssVar": "--ok-on-dark",
+        "tonalRamp": [
+          "#1d2929",
+          "#314b42",
+          "#466d5a",
+          "#5b8f73",
+          "#70b18c",
+          "#86d6a6",
+          "#b9e7cb",
+          "#e6f6ed"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Descarte Red",
+        "canonical": "#b83224",
+        "cssVar": "--danger",
+        "tonalRamp": [
+          "#461e1d",
+          "#9f2e23",
+          "#c14b3f",
+          "#cd6f65",
+          "#d9928b",
+          "#e6b5b0",
+          "#f1d6d3",
+          "#faf0ef"
+        ]
+      },
+      "danger-tint": {
+        "role": "tertiary",
+        "displayName": "Descarte Tint",
+        "canonical": "#fbecea",
+        "cssVar": "--danger-tint",
+        "tonalRamp": [
+          "#24262c",
+          "#454449",
+          "#666366",
+          "#868183",
+          "#a79fa0",
+          "#c8bdbd",
+          "#e6d9d7",
+          "#fcf0ee"
+        ]
+      },
+      "danger-line": {
+        "role": "tertiary",
+        "displayName": "Descarte Line",
+        "canonical": "#eeb2a9",
+        "cssVar": "--danger-line",
+        "tonalRamp": [
+          "#28252a",
+          "#504243",
+          "#785e5d",
+          "#a07a77",
+          "#c89790",
+          "#eeb2a9",
+          "#f6d5d0",
+          "#fcf0ee"
+        ]
+      },
+      "warn": {
+        "role": "tertiary",
+        "displayName": "Revisión Amber",
+        "canonical": "#9a5a00",
+        "cssVar": "--warn",
+        "tonalRamp": [
+          "#312514",
+          "#684009",
+          "#9a5a00",
+          "#af7c35",
+          "#c39c67",
+          "#d6bc98",
+          "#e8dac5",
+          "#f7f2ea"
+        ]
+      },
+      "warn-tint": {
+        "role": "tertiary",
+        "displayName": "Revisión Tint",
+        "canonical": "#fdf2e1",
+        "cssVar": "--warn-tint",
+        "tonalRamp": [
+          "#24272b",
+          "#444546",
+          "#656361",
+          "#85827c",
+          "#a6a098",
+          "#c6beb3",
+          "#e4dacc",
+          "#fdf2e1"
+        ]
+      },
+      "warn-line": {
+        "role": "tertiary",
+        "displayName": "Revisión Line",
+        "canonical": "#efc27e",
+        "cssVar": "--warn-line",
+        "tonalRamp": [
+          "#272624",
+          "#4d4436",
+          "#736247",
+          "#9a7f58",
+          "#c09d69",
+          "#e6bb7a",
+          "#f5d8ad",
+          "#fbf1e2"
+        ]
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "En Curso Blue",
+        "canonical": "#1d5fb8",
+        "cssVar": "--info",
+        "tonalRamp": [
+          "#142945",
+          "#194a8d",
+          "#2d6bbd",
+          "#5788ca",
+          "#80a5d7",
+          "#a9c2e4",
+          "#cfddf0",
+          "#eef3fa"
+        ]
+      },
+      "info-tint": {
+        "role": "tertiary",
+        "displayName": "En Curso Tint",
+        "canonical": "#e8f0fb",
+        "cssVar": "--info-tint",
+        "tonalRamp": [
+          "#22272d",
+          "#40454c",
+          "#5f646c",
+          "#7d838b",
+          "#9ba1ab",
+          "#b9c0ca",
+          "#d5dce7",
+          "#edf3fc"
+        ]
+      },
+      "info-line": {
+        "role": "tertiary",
+        "displayName": "En Curso Line",
+        "canonical": "#a9c4ea",
+        "cssVar": "--info-line",
+        "tonalRamp": [
+          "#202730",
+          "#3b4655",
+          "#56657a",
+          "#71849e",
+          "#8ca3c3",
+          "#a9c4ea",
+          "#cdddf3",
+          "#edf3fb"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Portal page title and login brand title."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Wizard step titles; RR.HH. panel page title."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Quiz question text, modal and drawer titles."
+      },
+      "title-sm": {
+        "displayName": "Title Small",
+        "purpose": "Form section, matrix and drawer section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text and field values."
+      },
+      "body-sm": {
+        "displayName": "Body Small",
+        "purpose": "Field labels (600), matrix cells, rail copy."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Field hints, dropzone subtext, metric descriptions."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase Narrow for terms, column headers, filters, metrics, status pills."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Phase numbers and quiz countdown, tabular."
+      },
+      "numeral-metric": {
+        "displayName": "Metric Numeral",
+        "purpose": "RR.HH. metrics strip values, tabular."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-1",
+        "value": "0 1px 2px rgba(28, 35, 45, 0.06), 0 1px 1px rgba(28, 35, 45, 0.04)",
+        "purpose": "Resting modules: form card, rail, metrics strip, matrix panel."
+      },
+      {
+        "name": "shadow-2",
+        "value": "0 8px 24px rgba(28, 35, 45, 0.12), 0 2px 6px rgba(28, 35, 45, 0.06)",
+        "purpose": "Overlays only: drawer, toasts, notification dropdown, skip link."
+      },
+      {
+        "name": "decision-footer",
+        "value": "0 -6px 16px rgba(28, 35, 45, 0.06)",
+        "purpose": "Sticky decision bar at the foot of the drawer."
+      },
+      {
+        "name": "reflective-strip",
+        "value": "inset 0 -5px 0 #c7ccd2",
+        "purpose": "Silver base strip of the primary button (3px pressed, 4px small). Tape, not elevation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "All transitions and keyframes."
+      },
+      {
+        "name": "state-change",
+        "value": "150ms",
+        "purpose": "Hover, border and fill transitions on controls."
+      },
+      {
+        "name": "phase-sheen",
+        "value": "700ms ease 150ms, once",
+        "purpose": "White sheen crossing the active phase stripe on activation."
+      },
+      {
+        "name": "state-flip",
+        "value": "320ms clip top-down + 340ms sheen at 100ms",
+        "purpose": "Split-flap flip of a matrix Estado cell after a state change."
+      },
+      {
+        "name": "drawer-in",
+        "value": "220ms, translateX(48px) to 0 with fade",
+        "purpose": "Expediente drawer entrance."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "Disables sheen, flip and overlay entrances; transitions collapse to 0.01ms; spinners slow to 2.4s."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "panel-wide",
+        "value": "1100px"
+      },
+      {
+        "name": "tablet",
+        "value": "1023px"
+      },
+      {
+        "name": "mobile",
+        "value": "767px"
+      },
+      {
+        "name": "mobile-sm",
+        "value": "639px"
+      },
+      {
+        "name": "panel-xs",
+        "value": "380px"
+      }
+    ],
+    "signatureStripe": {
+      "horizontal": "linear-gradient(to bottom, hivis 0 9%, reflect 9% 17%, hivis 17% 83%, reflect 83% 91%, hivis 91%)",
+      "vertical": "linear-gradient(to right, reflect 0 28%, transparent 28% 72%, reflect 72%) on an 18px band over graphite (login)"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single action that advances; hi-vis fill with a silver reflective base strip. One per view.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Continuar a evaluación técnica</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 0 20px; border: 1px solid transparent; border-radius: var(--radius, 6px); font-family: var(--font, 'Archivo', system-ui, sans-serif); font-size: 1rem; font-weight: 700; line-height: 1.2; cursor: pointer; transition: background-color 0.15s cubic-bezier(0.16,1,0.3,1), box-shadow 0.15s cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary { padding-bottom: 5px; background: var(--hivis, #ff6a13); color: var(--hivis-ink, #1c232d); box-shadow: inset 0 -5px 0 var(--reflect, #c7ccd2); } .ds-btn-primary:hover { background: var(--hivis-deep, #e05a0a); } .ds-btn-primary:active { box-shadow: inset 0 -3px 0 var(--reflect, #c7ccd2); } .ds-btn-primary:focus-visible { outline: 2px solid var(--hivis, #ff6a13); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every non-advancing action: white with a strong hairline.",
+      "html": "<button class=\"ds-btn-secondary\">Auditar</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; background: var(--surface, #fff); border: 1px solid var(--line-strong, #b4bcc5); border-radius: var(--radius, 6px); color: var(--ink, #1c232d); font-family: var(--font, 'Archivo', system-ui, sans-serif); font-size: 1rem; font-weight: 700; cursor: pointer; transition: background-color 0.15s, border-color 0.15s; } .ds-btn-secondary:hover { background: var(--surface-2, #f6f7f8); border-color: var(--text-3, #626c78); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--hivis, #ff6a13); outline-offset: 2px; }"
+    },
+    {
+      "name": "Disabled States",
+      "kind": "button",
+      "refersTo": "button-disabled",
+      "description": "Unavailable is struck through; loading shows a spinner; the drawer's current state carries a positive 'Estado actual' tag. Neither of the last two is struck.",
+      "html": "<div class=\"ds-row\"><button class=\"ds-btn-off ds-struck\" disabled>Aprobar faena</button><button class=\"ds-btn-off ds-loading\" disabled>Enviando</button><button class=\"ds-btn-off\" disabled>Pre-acreditado <span class=\"ds-current-tag\">Estado actual</span></button></div>",
+      "css": ".ds-row { display: flex; flex-wrap: wrap; gap: 8px; } .ds-btn-off { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 20px; background: var(--surface-3, #e9ecef); border: 1px solid var(--line, #d5d9de); border-radius: var(--radius, 6px); color: var(--text-3, #626c78); font-family: var(--font, 'Archivo', system-ui, sans-serif); font-size: 1rem; font-weight: 700; cursor: not-allowed; } .ds-struck { color: var(--text-2, #4a5562); text-decoration: line-through; text-decoration-color: var(--text-3, #626c78); text-decoration-thickness: 1.5px; } .ds-loading { cursor: progress; } .ds-loading::before { content: ''; width: 16px; height: 16px; border: 2px solid var(--line-strong, #b4bcc5); border-top-color: var(--text-2, #4a5562); border-radius: 50%; animation: ds-spin 0.8s linear infinite; } @keyframes ds-spin { to { transform: rotate(360deg); } } .ds-current-tag { padding: 2px 6px; background: var(--surface, #fff); border: 1px solid var(--line-strong, #b4bcc5); border-radius: 4px; color: var(--text, #1c232d); font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "48px field with a 1.5px strong hairline, tabular numerals and a hi-vis focus ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">RUT</span><input class=\"ds-input\" type=\"text\" value=\"21.559.457-2\"><span class=\"ds-field-hint\">Leído desde tu credencial; corrígelo si no coincide.</span></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; max-width: 360px; font-family: var(--font, 'Archivo', system-ui, sans-serif); } .ds-field-label { margin-bottom: 8px; color: var(--text, #1c232d); font-size: 0.875rem; font-weight: 600; } .ds-input { height: 48px; padding: 0 14px; background: var(--surface, #fff); border: 1.5px solid var(--line-strong, #b4bcc5); border-radius: var(--radius, 6px); color: var(--text, #1c232d); font: inherit; font-size: 1rem; font-variant-numeric: tabular-nums; transition: border-color 0.15s; } .ds-input:hover { border-color: var(--text-3, #626c78); } .ds-input:focus-visible { outline: 2px solid var(--hivis, #ff6a13); outline-offset: 2px; } .ds-field-hint { margin-top: 6px; color: var(--text-3, #626c78); font-size: 0.8125rem; line-height: 1.45; }"
+    },
+    {
+      "name": "Phase Band",
+      "kind": "nav",
+      "refersTo": "phase-segment-active",
+      "description": "Signature: the active phase wears hi-vis orange with a hard-stop double silver stripe and a one-time sheen.",
+      "html": "<ol class=\"ds-band\"><li class=\"ds-seg ds-done\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"20 6 9 17 4 12\"/></svg><span class=\"ds-seg-text\">Datos y documentos</span></li><li class=\"ds-seg ds-active\"><span class=\"ds-seg-num\">1.5</span><span class=\"ds-seg-text\">Evaluación técnica</span></li><li class=\"ds-seg\"><span class=\"ds-seg-num\">2</span><span class=\"ds-seg-text\">Acreditación</span></li></ol>",
+      "css": ".ds-band { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); height: 76px; margin: 0; padding: 0; list-style: none; background: var(--ink-2, #2a3340); } .ds-seg { position: relative; display: flex; align-items: center; gap: 14px; padding: 0 24px; overflow: hidden; color: var(--reflect-dim, #9aa3ad); border-left: 1px solid rgba(199,204,210,0.14); } .ds-seg:first-child { border-left: 0; } .ds-seg-num { font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 2.125rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; } .ds-seg-text { font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; } .ds-done { color: var(--reflect-hi, #eef1f4); } .ds-done svg { color: var(--ok-on-dark, #86d6a6); flex: none; } .ds-done .ds-seg-text { font-weight: 500; } .ds-active { color: var(--hivis-ink, #1c232d); border-color: transparent; background: linear-gradient(to bottom, var(--hivis, #ff6a13) 0 9%, var(--reflect, #c7ccd2) 9% 17%, var(--hivis, #ff6a13) 17% 83%, var(--reflect, #c7ccd2) 83% 91%, var(--hivis, #ff6a13) 91%); } .ds-active::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.6) 50%, transparent 70%); transform: translateX(-110%); animation: ds-sheen 700ms cubic-bezier(0.16,1,0.3,1) 150ms 1 both; } @keyframes ds-sheen { to { transform: translateX(110%); } } @media (prefers-reduced-motion: reduce) { .ds-active::after { display: none; } }"
+    },
+    {
+      "name": "Hard-Hat Status Pills",
+      "kind": "chip",
+      "refersTo": "status-neutral",
+      "description": "Every state as an explicit mark: square swatch, Narrow caps label, text colour on its own tint.",
+      "html": "<div class=\"ds-pills\"><span class=\"ds-pill ds-ok\">Contratado faena</span><span class=\"ds-pill ds-danger\">Descartado técnico</span><span class=\"ds-pill ds-warn\">En revisión manual</span><span class=\"ds-pill ds-info\">Aprobado faena</span><span class=\"ds-pill\">Postulado</span></div>",
+      "css": ".ds-pills { display: flex; flex-wrap: wrap; gap: 8px; } .ds-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 28px; padding: 4px 10px; background: var(--surface-3, #e9ecef); border-radius: 4px; color: var(--text-2, #4a5562); font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; line-height: 1.2; text-transform: uppercase; white-space: nowrap; } .ds-pill::before { content: ''; flex: none; width: 8px; height: 8px; background: currentColor; } .ds-ok { background: var(--ok-tint, #e7f4ec); color: var(--ok, #1f7a48); } .ds-danger { background: var(--danger-tint, #fbecea); color: var(--danger, #b83224); } .ds-warn { background: var(--warn-tint, #fdf2e1); color: var(--warn, #9a5a00); } .ds-info { background: var(--info-tint, #e8f0fb); color: var(--info, #1d5fb8); }"
+    },
+    {
+      "name": "Matrix State Cell",
+      "kind": "custom",
+      "refersTo": "matrix-row",
+      "description": "Dense 48px matrix rows grouped action-first; the Estado cell takes the full state tint and flips like a split-flap board on change.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>Folio</th><th>Postulante</th><th>Estado</th></tr></thead><tbody><tr class=\"ds-group\"><td colspan=\"3\">Requiere acción <span class=\"ds-count\">(1)</span></td></tr><tr><td class=\"ds-folio\">#3</td><td>Molina Lagos</td><td class=\"ds-state ds-state-warn ds-flip\"><span class=\"ds-mark\">En revisión manual</span></td></tr><tr class=\"ds-group\"><td colspan=\"3\">Resto de expedientes <span class=\"ds-count\">(1)</span></td></tr><tr><td class=\"ds-folio\">#5</td><td>Medina Pavez</td><td class=\"ds-state ds-state-ok\"><span class=\"ds-mark\">Contratado faena</span></td></tr></tbody></table>",
+      "css": ".ds-table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface, #fff); font-family: var(--font, 'Archivo', system-ui, sans-serif); font-size: 0.875rem; } .ds-table th { padding: 10px 12px; background: var(--surface-2, #f6f7f8); border-bottom: 1px solid var(--line, #d5d9de); color: var(--text-2, #4a5562); font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-align: left; text-transform: uppercase; } .ds-table td { height: 48px; padding: 6px 12px; border-bottom: 1px solid var(--line, #d5d9de); } .ds-table tbody tr:hover td { background: var(--surface-2, #f6f7f8); } .ds-group td, .ds-table tbody tr.ds-group:hover td { height: auto; padding: 5px 12px 4px; background: var(--surface-2, #f6f7f8); color: var(--text-2, #4a5562); font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; } .ds-count { color: var(--text-3, #626c78); font-variant-numeric: tabular-nums; } .ds-folio { font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-weight: 700; font-variant-numeric: tabular-nums; } .ds-state { position: relative; min-width: 11rem; } .ds-state-warn, .ds-table tbody tr:hover td.ds-state-warn { background: var(--warn-tint, #fdf2e1); color: var(--warn, #9a5a00); } .ds-state-ok, .ds-table tbody tr:hover td.ds-state-ok { background: var(--ok-tint, #e7f4ec); color: var(--ok, #1f7a48); } .ds-mark { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; } .ds-mark::before { content: ''; width: 8px; height: 8px; background: currentColor; } .ds-flip { animation: ds-flip 320ms cubic-bezier(0.16,1,0.3,1) both; } @keyframes ds-flip { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } } @media (prefers-reduced-motion: reduce) { .ds-flip { animation: none; } }"
+    },
+    {
+      "name": "Quiz Option Card",
+      "kind": "custom",
+      "refersTo": "option-card-selected",
+      "description": "Touch-first answer card; the applicant's current selection takes the hi-vis ring, wash and key.",
+      "html": "<div class=\"ds-options\"><button class=\"ds-option\"><span class=\"ds-key\">A</span><span>Detener la maniobra y avisar al supervisor</span></button><button class=\"ds-option ds-selected\"><span class=\"ds-key\">B</span><span>Aislar el área y verificar el plan de izaje</span></button></div>",
+      "css": ".ds-options { display: grid; gap: 10px; max-width: 560px; } .ds-option { display: flex; align-items: flex-start; gap: 14px; width: 100%; min-height: 56px; padding: 14px 16px; background: var(--surface, #fff); border: 1.5px solid var(--line-strong, #b4bcc5); border-radius: var(--radius, 6px); color: var(--text, #1c232d); font-family: var(--font, 'Archivo', system-ui, sans-serif); font-size: 1rem; line-height: 1.45; text-align: left; cursor: pointer; transition: background-color 0.15s, border-color 0.15s; } .ds-option:hover { background: var(--surface-2, #f6f7f8); border-color: var(--text-3, #626c78); } .ds-option:focus-visible { outline: 2px solid var(--hivis, #ff6a13); outline-offset: 2px; } .ds-key { display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-top: -2px; background: var(--surface-3, #e9ecef); border-radius: 4px; font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 0.875rem; font-weight: 700; } .ds-selected, .ds-selected:hover { background: var(--hivis-tint, #fff1e8); border-color: var(--hivis, #ff6a13); box-shadow: inset 0 0 0 1px var(--hivis, #ff6a13); } .ds-selected .ds-key { background: var(--hivis, #ff6a13); color: var(--hivis-ink, #1c232d); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Alta Visibilidad",
+    "overview": "The interface dresses like the worker's own personal protective equipment. A graphite shell bar carries the logo on a white plate; below it the page floor is a cold light grey and every working surface is white with a 1px hairline. Against that quiet field, one thing glows: a fluorescent orange band crossed by a double silver retroreflective stripe, worn only by whatever is active right now: the current phase, the one action that advances, the focus ring. Statuses speak the hard-hat code of a mining site (green conforme, red descarte, amber revisión, blue en curso, grey pendiente), each one an explicit mark with a square swatch and an uppercase narrow label.\n\nDensity follows the reader. The applicant portal is generous and touch-first (48px fields and buttons, 56px option cards, a 352px rail explaining why each document is asked for). The RR.HH. panel is a high-density module board: a five-cell metrics strip split by hairlines, a sticky-header matrix with 48px rows grouped action-first, and a right-hand drawer that opens the file without losing the matrix. Motion is brief and literal: a sheen crosses the reflective stripe when a phase activates, like headlights sweeping a vest, and a state cell flips like a split-flap board when it changes. Both stand down under reduced motion.\n\nThe system rejects the grey SaaS portal with a blue stepper and the earlier yellow-and-black hazard-stripe look. No gradients for atmosphere, no glass, no blur.",
+    "keyCharacteristics": [
+      "Fluorescent orange is reserved; the reflective double stripe is the signature of \"active\".",
+      "Hard-hat state code for every status, always as an explicit labelled mark.",
+      "Archivo for reading, Archivo Narrow in caps for labels and tabular numerals.",
+      "Flat white modules on a cold grey floor, 1px hairlines, 6px corners.",
+      "Unavailable means struck through; loading and \"current\" are never struck."
+    ],
+    "rules": [
+      {
+        "name": "The Hi-Vis Reservation Rule",
+        "body": "Orange marks only what is active now: the current phase, the single primary action, focus, and the user's own current selection. Never decoration, never a heading, never an icon tint, never a second primary button on the same view.",
+        "section": "colors"
+      },
+      {
+        "name": "The Hard-Hat Code Rule",
+        "body": "Every status uses exactly one of the five state families, always as text colour on its own tint. Colour never carries state alone; it travels with an uppercase label and a square swatch.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Numerals Rule",
+        "body": "Every number that can change or be compared (folios, scores, RUT, timers, counts, metrics, inputs) sets `font-variant-numeric: tabular-nums` so columns and countdowns never jitter.",
+        "section": "typography"
+      },
+      {
+        "name": "The Caps Belong to Labels Rule",
+        "body": "Uppercase Narrow is for naming a field, column, metric, state or rail section. It never sits as a small tag stacked above a heading; context lines (such as quiz progress) run in sentence case.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline Before Shadow Rule",
+        "body": "Separate with a 1px line or a tonal step first. Shadow is reserved for overlays; a resting module never gets more than the resting shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep hivis to the current phase, the one primary action, the focus ring and the user's current selection; text on it is graphite.",
+      "**Do** draw the reflective stripe as hard-stop silver bands (9 to 17% and 83 to 91% on horizontal bands; flat vertical bands on the login panel), never as a soft gradient.",
+      "**Do** show every status as a labelled hard-hat mark: square swatch, Narrow caps label, text colour on its own tint.",
+      "**Do** strike through the label of an unavailable button, and keep loading buttons (spinner) and the drawer's current-state button (positive \"Estado actual\" tag) unstruck.",
+      "**Do** set every comparable number in tabular numerals, and labels in Archivo Narrow caps.",
+      "**Do** order RR.HH. lists action first and keep column geometry fixed when a state changes.",
+      "**Do** separate with 1px hairlines and tonal steps; keep shadows to the resting and overlay values.",
+      "**Do** keep 48px fields and buttons and 44px minimum targets on the applicant side.",
+      "**Do** disable the phase sheen and the state flip under `prefers-reduced-motion`."
+    ],
+    "donts": [
+      "**Don't** use orange for decoration, headings, icons, links, borders at rest or a second CTA.",
+      "**Don't** bring back the blue SaaS stepper or the yellow-and-black hazard stripe.",
+      "**Don't** add gradients for atmosphere, glass, blur or backdrop effects; the only gradient-built shapes are the hard-stop reflective stripe and the momentary sheen.",
+      "**Don't** stack a small uppercase tag above a heading; a pill above a heading must carry a real state.",
+      "**Don't** set interface text in monospace. The panel's raw OCR log and magic-link box currently use a system monospace stack for literal data; that is a carried exception, not a pattern to extend.",
+      "**Don't** use text glyphs or emoji as icons; icons are drawn SVG (2px stroke) inline or as masks.",
+      "**Don't** let colour carry a state without its label.",
+      "**Don't** use the legacy alias variables (`--ecf-*`, `--safety-yellow*`, `--status-*`, `--radius-terminal`) in new work; they exist only so existing JS keeps resolving."
+    ]
+  }
+}

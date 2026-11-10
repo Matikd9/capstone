@@ -72,45 +72,47 @@ async function sendPhase2InvitationEmail({
 <head>
   <meta charset="UTF-8">
   <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0F1115; color: #F3F4F6; margin: 0; padding: 20px; }
-    .container { max-width: 600px; margin: 0 auto; background: #14171E; border: 1px solid #262930; border-top: 4px solid #FFB800; border-radius: 4px; padding: 30px; }
-    .header { border-bottom: 1px solid #262930; padding-bottom: 15px; margin-bottom: 20px; }
-    .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; padding: 4px 10px; font-family: monospace; font-size: 12px; font-weight: bold; border-radius: 2px; }
-    h1 { font-size: 18px; margin: 15px 0 5px 0; color: #F3F4F6; letter-spacing: 0.05em; text-transform: uppercase; }
-    p { font-size: 14px; line-height: 1.6; color: #9CA3AF; margin: 12px 0; }
-    .highlight { color: #FFB800; font-weight: bold; }
-    .action-box { background: #181C24; border: 1px dashed #FFB800; padding: 20px; text-align: center; margin: 25px 0; border-radius: 2px; }
-    .btn { display: inline-block; background: #F95738; color: #FFFFFF !important; text-decoration: none; padding: 12px 24px; font-weight: bold; font-family: monospace; font-size: 14px; border-radius: 2px; letter-spacing: 0.05em; }
-    .btn:hover { background: #E0482B; }
-    .link-alt { font-size: 11px; word-break: break-all; color: #6B7280; margin-top: 15px; font-family: monospace; }
-    .footer { border-top: 1px solid #262930; padding-top: 15px; margin-top: 25px; font-size: 11px; color: #6B7280; font-family: monospace; }
+    body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #F8FAFC; color: #526173; margin: 0; padding: 24px; }
+    .container { max-width: 600px; margin: 0 auto; background: #FFFFFF; border: 1px solid #DDE3EA; border-top: 4px solid #0F2942; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.05); padding: 32px; }
+    .accent-line { height: 3px; background-color: #F5A623; margin-bottom: 20px; border-radius: 2px; }
+    .header { border-bottom: 1px solid #DDE3EA; padding-bottom: 20px; margin-bottom: 24px; }
+    .badge { display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px; }
+    h1 { font-size: 18px; margin: 12px 0 0 0; color: #0F2942; font-weight: 700; letter-spacing: 0.02em; }
+    p { font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0; }
+    .highlight { color: #0F2942; font-weight: 700; }
+    .action-box { background-color: #F8FAFC; border: 1px solid #DDE3EA; border-radius: 6px; padding: 24px; text-align: center; margin: 24px 0; }
+    .btn { display: inline-block; background-color: #0F2942; color: #FFFFFF !important; border: none; border-radius: 8px; font-weight: 600; padding: 14px 28px; text-decoration: none; font-size: 14px; }
+    .btn:hover { background-color: #1A3E61; }
+    .link-alt { font-size: 12px; word-break: break-all; color: #526173; margin-top: 16px; }
+    .footer { border-top: 1px solid #DDE3EA; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #526173; line-height: 1.5; }
   </style>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <span class="badge">[ACCESO A FAENA APROBADO]</span>
-      <h1>Nexxo S.A. — División El Teniente (Codelco)</h1>
+<body style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #F8FAFC; color: #526173; margin: 0; padding: 24px;">
+  <div class="container" style="max-width: 600px; margin: 0 auto; background: #FFFFFF; border: 1px solid #DDE3EA; border-top: 4px solid #0F2942; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.05); padding: 32px;">
+    <div class="accent-line" style="height: 3px; background-color: #F5A623; margin-bottom: 20px; border-radius: 2px;"></div>
+    <div class="header" style="border-bottom: 1px solid #DDE3EA; padding-bottom: 20px; margin-bottom: 24px;">
+      <span class="badge" style="display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px;">ACCESO A FAENA APROBADO</span>
+      <h1 style="font-size: 18px; margin: 12px 0 0 0; color: #0F2942; font-weight: 700; letter-spacing: 0.02em;">Nexxo S.A. — División El Teniente (Codelco)</h1>
     </div>
 
-    <p>Estimado/a <strong style="color:#F3F4F6;">${candidateName}</strong>,</p>
-    <p>Le informamos que su evaluación técnica para el cargo de <span class="highlight">${roleName}</span> ha sido <strong>APROBADA</strong> por el equipo de Reclutamiento y Acreditación de Nexxo S.A.</p>
+    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Estimado/a <strong style="color: #0F2942;">${candidateName}</strong>,</p>
+    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Le informamos que su evaluación técnica para el cargo de <span class="highlight" style="color: #0F2942; font-weight: 700;">${roleName}</span> ha sido <strong style="color: #0F2942;">APROBADA</strong> por el equipo de Reclutamiento y Acreditación de Nexxo S.A.</p>
     
-    <p>Ha sido seleccionado para ingresar a la dotación de parada de planta. Para conformar su <strong>Carpeta de Acreditación WebControl Codelco</strong>, debe ingresar al siguiente enlace exclusivo para cargar su <strong>Cédula de Identidad</strong> y <strong>Certificado de Antecedentes para Fines Especiales</strong>:</p>
+    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Ha sido seleccionado para ingresar a la dotación de parada de planta. Para conformar su <strong style="color: #0F2942;">Carpeta de Acreditación WebControl Codelco</strong>, debe ingresar al siguiente enlace exclusivo para cargar su <strong style="color: #0F2942;">Cédula de Identidad</strong> y <strong style="color: #0F2942;">Certificado de Antecedentes para Fines Especiales</strong>:</p>
 
-    <div class="action-box">
-      <a href="${magic_link}" class="btn" target="_blank">[ INGRESAR A FASE 02: VALIDACIÓN DOCUMENTAL ]</a>
-      <div class="link-alt">
+    <div class="action-box" style="background-color: #F8FAFC; border: 1px solid #DDE3EA; border-radius: 6px; padding: 24px; text-align: center; margin: 24px 0;">
+      <a href="${magic_link}" class="btn" target="_blank" style="display: inline-block; background-color: #0F2942; color: #FFFFFF !important; border: none; border-radius: 8px; font-weight: 600; padding: 14px 28px; text-decoration: none; font-size: 14px;">INGRESAR A FASE 02: VALIDACIÓN DOCUMENTAL</a>
+      <div class="link-alt" style="font-size: 12px; word-break: break-all; color: #526173; margin-top: 16px;">
         O copie y pegue esta URL en su navegador:<br>
-        <a href="${magic_link}" style="color: #FFB800;">${magic_link}</a>
+        <a href="${magic_link}" style="color: #0F2942; font-weight: 600; text-decoration: underline;">${magic_link}</a>
       </div>
     </div>
 
-    <p style="font-size: 12px; color: #9CA3AF;">
-      <strong>Vigencia del enlace:</strong> Este enlace de acceso directo es personal e intransferible y tiene una validez de 7 días corridos (vence el <strong>${formattedDate}</strong>).
+    <p style="font-size: 12px; color: #526173; margin: 12px 0;">
+      <strong style="color: #0F2942;">Vigencia del enlace:</strong> Este enlace de acceso directo es personal e intransferible y tiene una validez de 7 días corridos (vence el <strong style="color: #0F2942;">${formattedDate}</strong>).
     </p>
 
-    <div class="footer">
+    <div class="footer" style="border-top: 1px solid #DDE3EA; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #526173; line-height: 1.5;">
       Nexxo S.A. | Sistema de Acreditación Industrial & Control de Acceso Codelco DS N° 132.<br>
       En cumplimiento de la Ley N° 19.628, sus antecedentes penales solo son solicitados al contar con aprobación formal de cupo de faena.
     </div>
@@ -200,45 +202,56 @@ async function sendHiredConfirmationEmail({ email, full_name, position_name }) {
 <head>
   <meta charset="UTF-8">
   <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0F1115; color: #F3F4F6; margin: 0; padding: 20px; }
-    .container { max-width: 600px; margin: 0 auto; background: #14171E; border: 1px solid #262930; border-top: 4px solid #10B981; border-radius: 4px; padding: 30px; }
-    .header { border-bottom: 1px solid #262930; padding-bottom: 15px; margin-bottom: 20px; }
-    .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; padding: 4px 10px; font-family: monospace; font-size: 12px; font-weight: bold; border-radius: 2px; }
-    h1 { font-size: 18px; margin: 15px 0 5px 0; color: #F3F4F6; letter-spacing: 0.05em; text-transform: uppercase; }
-    p { font-size: 14px; line-height: 1.6; color: #9CA3AF; margin: 12px 0; }
-    .highlight { color: #FFB800; font-weight: bold; }
-    .info-box { background: #181C24; border: 1px solid #262930; padding: 18px; margin: 20px 0; border-radius: 4px; }
-    .info-item { font-size: 13px; color: #D1D5DB; margin-bottom: 8px; }
-    .info-label { color: #9CA3AF; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-    .footer { border-top: 1px solid #262930; padding-top: 15px; margin-top: 25px; font-size: 11px; color: #6B7280; font-family: monospace; }
+    body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #F8FAFC; color: #526173; margin: 0; padding: 24px; }
+    .container { max-width: 600px; margin: 0 auto; background: #FFFFFF; border: 1px solid #DDE3EA; border-top: 4px solid #0F2942; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.05); padding: 32px; }
+    .accent-line { height: 3px; background-color: #F5A623; margin-bottom: 20px; border-radius: 2px; }
+    .header { border-bottom: 1px solid #DDE3EA; padding-bottom: 20px; margin-bottom: 24px; }
+    .badge { display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px; }
+    h1 { font-size: 18px; margin: 12px 0 0 0; color: #0F2942; font-weight: 700; letter-spacing: 0.02em; }
+    p { font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0; }
+    .highlight { color: #0F2942; font-weight: 700; }
+    .info-box { background-color: #F8FAFC; border: 1px solid #DDE3EA; border-radius: 6px; padding: 16px; margin: 20px 0; }
+    .info-item { font-size: 13px; color: #526173; margin-bottom: 8px; }
+    .info-label { color: #526173; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; }
+    .footer { border-top: 1px solid #DDE3EA; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #526173; line-height: 1.5; }
   </style>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <span class="badge">[ACREDITACIÓN APROBADA // ASIGNADO A PARADA]</span>
-      <h1>Nexxo S.A. — División El Teniente (Codelco)</h1>
+<body style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #F8FAFC; color: #526173; margin: 0; padding: 24px;">
+  <div class="container" style="max-width: 600px; margin: 0 auto; background: #FFFFFF; border: 1px solid #DDE3EA; border-top: 4px solid #0F2942; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.05); padding: 32px;">
+    <div class="accent-line" style="height: 3px; background-color: #F5A623; margin-bottom: 20px; border-radius: 2px;"></div>
+    <div class="header" style="border-bottom: 1px solid #DDE3EA; padding-bottom: 20px; margin-bottom: 24px;">
+      <span class="badge" style="display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px;">ACREDITACIÓN APROBADA // ASIGNADO A PARADA</span>
+      <h1 style="font-size: 18px; margin: 12px 0 0 0; color: #0F2942; font-weight: 700; letter-spacing: 0.02em;">Nexxo S.A. — División El Teniente (Codelco)</h1>
     </div>
 
-    <p>Estimado/a <strong style="color:#F3F4F6;">${candidateName}</strong>,</p>
-    <p>Le informamos que su expediente documental y acreditación técnica para el cargo de <span class="highlight">${roleName}</span> han sido <strong>APROBADOS</strong> por el Departamento de Selección y Recursos Humanos de Nexxo S.A.</p>
+    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Estimado/a <strong style="color: #0F2942;">${candidateName}</strong>,</p>
+    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Le informamos que su expediente documental y acreditación técnica para el cargo de <span class="highlight" style="color: #0F2942; font-weight: 700;">${roleName}</span> han sido <strong style="color: #0F2942;">APROBADOS</strong> por el Departamento de Selección y Recursos Humanos de Nexxo S.A.</p>
     
-    <div class="info-box">
-      <div class="info-item"><span class="info-label">Estado:</span> <strong style="color: #10B981;">Acreditación Conforme y Confirmada</strong></div>
-      <div class="info-item"><span class="info-label">Faena:</span> Codelco División El Teniente (Rancagua)</div>
-      <div class="info-item"><span class="info-label">Pase de Acceso:</span> Carpeta WebControl en tramitación reglamentaria</div>
+    <div class="info-box" style="background-color: #F8FAFC; border: 1px solid #DDE3EA; border-radius: 6px; padding: 16px; margin: 20px 0;">
+      <div class="info-item" style="font-size: 13px; color: #526173; margin-bottom: 8px;">
+        <span class="info-label" style="color: #526173; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Estado:</span>
+        <span class="badge" style="display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 4px 8px; font-size: 12px; font-weight: 600; border-radius: 4px; margin-left: 6px;">Acreditación Conforme y Confirmada</span>
+      </div>
+      <div class="info-item" style="font-size: 13px; color: #526173; margin-bottom: 8px;">
+        <span class="info-label" style="color: #526173; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Faena:</span>
+        <strong style="color: #0F2942; margin-left: 6px;">Codelco División El Teniente (Rancagua)</strong>
+      </div>
+      <div class="info-item" style="font-size: 13px; color: #526173; margin-bottom: 0;">
+        <span class="info-label" style="color: #526173; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Pase de Acceso:</span>
+        <span style="color: #0F2942; margin-left: 6px;">Carpeta WebControl en tramitación reglamentaria</span>
+      </div>
     </div>
 
-    <p>
+    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">
       Su incorporación a la dotación operativa de parada de planta se encuentra formalizada. Durante las próximas horas, el equipo de Operaciones de Nexxo S.A. se comunicará con usted vía telefónica o correo para coordinar:
     </p>
-    <ul style="font-size: 13px; color: #D1D5DB; line-height: 1.8;">
+    <ul style="font-size: 13px; color: #526173; line-height: 1.8; padding-left: 20px; margin: 12px 0;">
       <li>Inducción de Seguridad en Faena (Obligación de Informar - ODI).</li>
       <li>Examen Ocupacional / Batería de Altura Geográfica y ECF.</li>
       <li>Programación de turno y entrega de Equipo de Protección Personal (EPP).</li>
     </ul>
 
-    <div class="footer">
+    <div class="footer" style="border-top: 1px solid #DDE3EA; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #526173; line-height: 1.5;">
       Nexxo S.A. | División Operaciones & Mantenimiento Minero.<br>
       Plataforma de Acreditación conforme a Estándares ECF Codelco y Reglamento de Seguridad Minera DS N° 132.
     </div>

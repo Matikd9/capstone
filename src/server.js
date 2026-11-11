@@ -96,6 +96,8 @@ app.use((req, res, next) => {
 app.use("/api/", generalApiLimiter);
 app.use("/api/ocr/", ocrRateLimiter);
 app.use("/api/auth/admin-login", loginRateLimiter);
+// Defensa CSRF para rutas autenticadas por cookie
+app.use("/api/", auth.requireSameOrigin);
 
 // ==========================================
 // RUTAS EXCLUSIVAS DEL PORTAL RR.HH.
@@ -104,8 +106,16 @@ app.get("/admin/login", (req, res) => {
   res.sendFile(path.join(__dirname, "admin_portal/login.html"));
 });
 
-app.get("/admin", (req, res) => {
-  res.sendFile(path.join(__dirname, "admin_portal/admin.html"));
+app.get("/admin", async (req, res) => {
+  try {
+    const user = await auth.getAdminFromSessionToken(
+      auth.parseCookies(req)[auth.ADMIN_COOKIE],
+    );
+    if (!user) return res.redirect(302, "/admin/login");
+    res.sendFile(path.join(__dirname, "admin_portal/admin.html"));
+  } catch (err) {
+    res.redirect(302, "/admin/login");
+  }
 });
 
 // Bloqueo explícito de la URL pública previa
@@ -2542,42 +2552,20 @@ app.get(["/api/files/:filename", "/uploads/:filename"], async (req, res) => {
         .json({ error: "Documento no encontrado o expirado en el servidor." });
     }
 
-    // 2. Verificar si es administrador RR.HH. autenticado (por cabecera, query param o cookie)
-    const authHeader = req.headers["authorization"];
-    let token =
-      authHeader && authHeader.startsWith("Bearer ")
-        ? authHeader.slice(7).trim()
-        : null;
-    if (!token && req.query && req.query.token) {
-      token = String(req.query.token).trim();
-    }
-    if (!token && req.headers.cookie) {
-      const match = req.headers.cookie.match(/(?:^|;\s*)admin_token=([^;]*)/);
-      if (match) token = decodeURIComponent(match[1]);
-    }
+    // 2. Verificar si es administrador RR.HH. autenticado (cookie de sesión nexxo_admin)
+    const adminUser = await auth.getAdminFromRequest(req);
+    let isAuthorized = Boolean(adminUser);
 
-    let isAuthorized = false;
-    if (token) {
-      const adminPayload = auth.verifyToken(token);
-      if (adminPayload) isAuthorized = true;
-    }
-
-    // 3. Si no es admin, verificar si es el candidato que posee el documento (vía candidate_token)
-    if (!isAuthorized && req.query && req.query.candidate_token) {
-      const candToken = String(req.query.candidate_token).trim();
+    // 3. Si no es admin, verificar si es el candidato que posee el documento
+    //    (cookie de sesión de postulante nexxo_cand)
+    const fileLikeSql =
+      "(cv_file LIKE ? OR credencial_file LIKE ? OR carnet_file LIKE ? OR carnet_back_file LIKE ? OR antecedentes_file LIKE ? OR initial_selfie LIKE ?)";
+    const fileLikeParams = Array(6).fill(`%${filename}`);
+    const sessionCid = !isAuthorized && auth.getCandidateIdFromRequest(req);
+    if (sessionCid) {
       const [rows] = await pool.query(
-        `SELECT id FROM candidates 
-         WHERE access_token = ? 
-           AND (cv_file LIKE ? OR credencial_file LIKE ? OR carnet_file LIKE ? OR carnet_back_file LIKE ? OR antecedentes_file LIKE ? OR initial_selfie LIKE ?)`,
-        [
-          candToken,
-          `%${filename}`,
-          `%${filename}`,
-          `%${filename}`,
-          `%${filename}`,
-          `%${filename}`,
-          `%${filename}`,
-        ],
+        `SELECT id FROM candidates WHERE id = ? AND ${fileLikeSql}`,
+        [sessionCid, ...fileLikeParams],
       );
       if (rows.length > 0) isAuthorized = true;
     }
@@ -3250,15 +3238,21 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
     } = req.body;
 
     // Regla de Integridad: Un evaluador administrativo no puede subir antecedentes a nombre del postulante
-    const authHeader = req.headers["authorization"];
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const maybeAdmin = auth.verifyToken(authHeader.split(" ")[1]);
-      if (maybeAdmin && maybeAdmin.role) {
-        return res.status(403).json({
-          error:
-            "Operación no permitida: Los administradores no pueden cargar documentos de identidad en nombre del postulante.",
-        });
-      }
+    const maybeAdmin = await auth.getAdminFromRequest(req);
+    if (maybeAdmin) {
+      return res.status(403).json({
+        error:
+          "Operación no permitida: Los administradores no pueden cargar documentos de identidad en nombre del postulante.",
+      });
+    }
+
+    // Solo el postulante dueño de la sesión (cookie emitida al canjear el magic link) puede cargar su Fase 2
+    const sessionCid = auth.getCandidateIdFromRequest(req);
+    if (!sessionCid || sessionCid !== Number(id)) {
+      return res.status(401).json({
+        error:
+          "Sesión de postulante no válida o expirada. Abra nuevamente el enlace enviado a su correo para continuar.",
+      });
     }
 
     if (!carnet_file || !antecedentes_file) {
@@ -3684,60 +3678,64 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
 });
 
 // 5.5 VALIDACIÓN DE TOKEN DE ACCESO ASÍNCRONO A FASE 2
-app.get("/api/candidates/access/:token", async (req, res) => {
-  try {
-    const { token } = req.params;
-    if (!token || token.trim().length < 16) {
-      return res
-        .status(400)
-        .json({ error: "Token de acceso no especificado o formato inválido." });
-    }
-
-    const [rows] = await pool.query(
-      `SELECT c.id, c.full_name, c.rut_id, c.email, c.phone, c.city, c.experience_years, 
+// whereSql es una constante interna ("c.access_token = ?" o "c.id = ?"), nunca entrada del usuario.
+async function loadCandidateAccess(whereSql, param) {
+  const [rows] = await pool.query(
+    `SELECT c.id, c.full_name, c.rut_id, c.email, c.phone, c.city, c.experience_years, 
               c.position_id, c.status, c.score_tecnico, c.score_sjt, c.sjt_conforme, 
               c.token_expires_at, c.token_used_at, c.phase2_submitted_at, c.carnet_file,
               c.ocr_carnet_vigencia, c.ocr_antecedentes_status, c.discrepancy_notes,
               p.name as position_name, p.required_credential
        FROM candidates c
        LEFT JOIN positions p ON c.position_id = p.id
-       WHERE c.access_token = ?`,
-      [token.trim()],
-    );
+       WHERE ${whereSql}`,
+    [param],
+  );
 
-    if (rows.length === 0) {
-      return res.status(404).json({
+  if (rows.length === 0) {
+    return {
+      status: 404,
+      body: {
         error: "Enlace de acceso no encontrado o no registrado en el sistema.",
-      });
-    }
+      },
+    };
+  }
 
-    const c = rows[0];
+  const c = rows[0];
 
-    // Verificar si expiró el token (7 días)
-    if (c.token_expires_at && new Date() > new Date(c.token_expires_at)) {
-      return res.status(403).json({
+  // Verificar si expiró el token (7 días)
+  if (c.token_expires_at && new Date() > new Date(c.token_expires_at)) {
+    return {
+      status: 403,
+      body: {
         error:
           "Este enlace de acceso ha expirado (validez máxima de 7 días). Solicite a RR.HH. un nuevo enlace de acreditación.",
-      });
-    }
+      },
+    };
+  }
 
-    // Regla de corte: Debe estar aprobado para faena por RR.HH.
-    const allowedStatuses = [
-      "APROBADO_FAENA",
-      "DOCS_CARGADOS",
-      "EN_REVISION_MANUAL",
-      "PRE_ACREDITADO",
-      "CONTRATADO_FAENA",
-      "DESCARTADO_TECNICO",
-    ];
-    if (!allowedStatuses.includes(c.status)) {
-      return res.status(403).json({
+  // Regla de corte: Debe estar aprobado para faena por RR.HH.
+  const allowedStatuses = [
+    "APROBADO_FAENA",
+    "DOCS_CARGADOS",
+    "EN_REVISION_MANUAL",
+    "PRE_ACREDITADO",
+    "CONTRATADO_FAENA",
+    "DESCARTADO_TECNICO",
+  ];
+  if (!allowedStatuses.includes(c.status)) {
+    return {
+      status: 403,
+      body: {
         error:
           "Su postulación aún no cuenta con la aprobación formal de acceso a faena por parte de RR.HH.",
-      });
-    }
+      },
+    };
+  }
 
-    res.json({
+  return {
+    status: 200,
+    body: {
       id: c.id,
       full_name: c.full_name,
       rut_id: c.rut_id,
@@ -3758,10 +3756,47 @@ app.get("/api/candidates/access/:token", async (req, res) => {
       ocr_carnet_vigencia: c.ocr_carnet_vigencia,
       ocr_antecedentes_status: c.ocr_antecedentes_status,
       discrepancy_notes: c.discrepancy_notes,
-    });
+    },
+  };
+}
+
+// Canje del magic link por una sesión de postulante en cookie HttpOnly (reutilizable hasta Fase 2)
+app.post("/api/candidates/session", async (req, res) => {
+  try {
+    const token =
+      req.body && typeof req.body.token === "string"
+        ? req.body.token.trim()
+        : "";
+    if (token.length < 16) {
+      return res
+        .status(400)
+        .json({ error: "Token de acceso no especificado o formato inválido." });
+    }
+    const result = await loadCandidateAccess("c.access_token = ?", token);
+    if (result.status === 200) {
+      auth.createCandidateSession(res, result.body.id);
+    }
+    res.status(result.status).json(result.body);
   } catch (err) {
-    console.error("[Error /api/candidates/access/:token]:", err);
-    res.status(500).json({ error: err.message });
+    console.error("[Error /api/candidates/session]: fallo al crear sesión.");
+    res.status(500).json({ error: "Error interno al validar el enlace." });
+  }
+});
+
+app.get("/api/candidates/me", async (req, res) => {
+  try {
+    const cid = auth.getCandidateIdFromRequest(req);
+    if (!cid) {
+      return res.status(401).json({
+        error:
+          "Sesión de postulante no válida o expirada. Abra nuevamente el enlace de su correo.",
+      });
+    }
+    const result = await loadCandidateAccess("c.id = ?", cid);
+    res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error("[Error /api/candidates/me]: fallo al cargar la sesión.");
+    res.status(500).json({ error: "Error interno al cargar la postulación." });
   }
 });
 
@@ -3799,25 +3834,21 @@ app.post("/api/auth/admin-login", async (req, res) => {
       return res.status(401).json({ error: "Credenciales inválidas." });
     }
 
-    const token = auth.generateToken({
-      id: admin.id,
-      username: admin.username,
-      fullName: admin.full_name,
-      role: admin.role,
-    });
-
     console.log(
       `[AUTH] Inicio de sesión exitoso para operador: ${admin.username} (${admin.role})`,
     );
 
-    res.setHeader(
-      "Set-Cookie",
-      `admin_token=${token}; Path=/; SameSite=Lax; Max-Age=${8 * 3600}`,
+    const sessionToken = await auth.createAdminSession(admin.id);
+    auth.setCookie(
+      res,
+      auth.ADMIN_COOKIE,
+      sessionToken,
+      auth.ADMIN_SESSION_SECONDS,
     );
+    auth.clearCookie(res, "admin_token");
 
     res.json({
       success: true,
-      token,
       user: {
         id: admin.id,
         username: admin.username,
@@ -3831,20 +3862,29 @@ app.post("/api/auth/admin-login", async (req, res) => {
   }
 });
 
-app.get("/api/auth/verify", (req, res) => {
-  const authHeader = req.headers["authorization"];
-  let token =
-    authHeader && authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7).trim()
-      : null;
-  if (!token && req.query && req.query.token) {
-    token = String(req.query.token).trim();
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    const sessionToken = auth.parseCookies(req)[auth.ADMIN_COOKIE];
+    if (sessionToken) await auth.revokeAdminSession(sessionToken);
+  } catch (err) {
+    console.error("[Error /api/auth/logout]: no se pudo revocar la sesión.");
   }
-  const user = auth.verifyToken(token);
-  if (!user) {
-    return res.status(401).json({ valid: false });
+  auth.clearCookie(res, auth.ADMIN_COOKIE);
+  auth.clearCookie(res, "admin_token");
+  res.json({ success: true });
+});
+
+app.get("/api/auth/verify", async (req, res) => {
+  try {
+    const user = await auth.getAdminFromRequest(req);
+    if (!user) {
+      return res.status(401).json({ valid: false });
+    }
+    res.json({ valid: true, user });
+  } catch (err) {
+    console.error("[Error /api/auth/verify]: fallo al validar la sesión.");
+    res.status(401).json({ valid: false });
   }
-  res.json({ valid: true, user });
 });
 
 // 5.6 PANEL RR.HH.: APROBAR ACCESO A FAENA Y EMITIR ENLACE DE FASE 2
@@ -4156,11 +4196,10 @@ app.get(
         c.total_questions > 0
           ? Math.round((c.score / c.total_questions) * 100)
           : 0;
-      const reqTokenParam = encodeURIComponent(req.query.token || "");
-
+      // La cookie HttpOnly de sesión viaja sola en la pestaña nueva: no se anexan tokens a la URL
       const fileUrlWithAuth = (fileUrl) => {
         if (!fileUrl) return "";
-        return `${escapeHtml(fileUrl)}?token=${reqTokenParam}`;
+        return escapeHtml(fileUrl);
       };
 
       const htmlReport = `<!DOCTYPE html>

@@ -1,36 +1,42 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Verificación estricta de sesión de Administrador
-  const adminToken = sessionStorage.getItem("nexxo_admin_token");
-  if (!adminToken) {
-    window.location.replace("/admin/login");
-    return;
-  }
+  // Limpiar restos de versiones anteriores (la sesión vive en una cookie HttpOnly)
+  sessionStorage.removeItem("nexxo_admin_token");
+  sessionStorage.removeItem("nexxo_admin_user");
 
-  // Visualizar operador autenticado
-  try {
-    const adminUser = JSON.parse(
-      sessionStorage.getItem("nexxo_admin_user") || "{}",
-    );
-    const badge = document.getElementById("admin-user-badge");
-    if (badge && adminUser.username) {
-      badge.textContent = `Administrador RR.HH. · ${adminUser.username}`;
-    }
-  } catch (e) {}
+  // Verificación de sesión de Administrador y visualización del operador
+  fetch("/api/auth/verify", { credentials: "same-origin" })
+    .then(async (res) => {
+      if (!res.ok) {
+        window.location.replace("/admin/login");
+        return;
+      }
+      const data = await res.json();
+      const badge = document.getElementById("admin-user-badge");
+      if (badge && data.user && data.user.username) {
+        badge.textContent = `Administrador RR.HH. · ${data.user.username}`;
+      }
+    })
+    .catch(() => {});
 
   // Enlazar botón Cerrar Sesión
   const btnLogout = document.getElementById("btn-logout");
   if (btnLogout) {
-    btnLogout.addEventListener("click", () => {
+    btnLogout.addEventListener("click", async () => {
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "same-origin",
+        });
+      } catch (e) {}
       sessionStorage.removeItem("nexxo_admin_token");
       sessionStorage.removeItem("nexxo_admin_user");
       window.location.replace("/admin/login");
     });
   }
 
-  // Wrapper para peticiones autenticadas
+  // Wrapper para peticiones autenticadas (cookie HttpOnly de sesión)
   async function authFetch(url, options = {}) {
-    options.headers = options.headers || {};
-    options.headers["Authorization"] = `Bearer ${adminToken}`;
+    options.credentials = "same-origin";
     const res = await fetch(url, options);
     if (res.status === 401 || res.status === 403) {
       if (typeof showToast === "function") {
@@ -438,7 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
               ${
                 canExport
                   ? `
-                <a href="/api/admin/candidates/${c.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-secondary btn-sm btn-export" title="Generar Carpeta Estandarizada WebControl">
+                <a href="/api/admin/candidates/${c.id}/export-webcontrol" target="_blank" class="btn btn-secondary btn-sm btn-export" title="Generar Carpeta Estandarizada WebControl">
                   WebControl
                 </a>
               `
@@ -665,7 +671,7 @@ document.addEventListener("DOMContentLoaded", () => {
           ${carnetUrl ? `<button type="button" onclick="openSecureDocViewer('${carnetUrl}', 'Cédula de Identidad (Frente)')" class="btn btn-secondary btn-sm">Ver cédula frente</button>` : ""}
           ${candidate.carnet_back_file ? `<button type="button" onclick="openSecureDocViewer('${candidate.carnet_back_file}', 'Cédula de Identidad (Reverso)')" class="btn btn-secondary btn-sm">Ver cédula reverso</button>` : ""}
           ${candidate.antecedentes_file ? `<button type="button" onclick="openSecureDocViewer('${candidate.antecedentes_file}', 'Certificado de Antecedentes')" class="btn btn-secondary btn-sm">Ver antecedentes</button>` : ""}
-          <a href="/api/admin/candidates/${candidate.id}/export-webcontrol?token=${encodeURIComponent(adminToken)}" target="_blank" class="btn btn-secondary btn-sm btn-export">
+          <a href="/api/admin/candidates/${candidate.id}/export-webcontrol" target="_blank" class="btn btn-secondary btn-sm btn-export">
             Generar carpeta WebControl (PDF / estandarizado)
           </a>
         </div>
@@ -864,8 +870,8 @@ document.addEventListener("DOMContentLoaded", () => {
   window.openSecureDocViewer = function (url, title = "Documento") {
     if (!url) return;
     const separator = url.includes("?") ? "&" : "?";
-    const authUrl = `${url}${separator}token=${encodeURIComponent(adminToken)}`;
-    const downloadUrl = `${url}${separator}token=${encodeURIComponent(adminToken)}&download=1`;
+    const authUrl = url;
+    const downloadUrl = `${url}${separator}download=1`;
     if (docModalTitle) docModalTitle.textContent = title;
     if (docViewerFrame) docViewerFrame.src = authUrl;
     if (docModalDownload) {

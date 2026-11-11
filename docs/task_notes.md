@@ -73,3 +73,24 @@ Asimismo, se actualizaron las definiciones de creación de tabla en `CREATE TABL
    - Si se detecta suplantación de identidad (persona diferente rindiendo el test o discrepancia con el documento oficial), `facial_match_ok` se establece en `false` y `crossCheckOk` se rechaza categóricamente.
 4. **Protección del Workflow Normativo**:
    - Ante cualquier falla en el cotejo biométrico facial, el postulante jamás avanza automáticamente a `PRE_ACREDITADO`, siendo derivado a `EN_REVISION_MANUAL` con alertas visuales destacadas para el auditor humano de Nexxo S.A.
+
+## Tarea 1.2 — Sesiones seguras
+
+**DDL nueva** (`initAdminAuth` en `src/auth.js`):
+
+```sql
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token_hash CHAR(64) PRIMARY KEY,
+  admin_id INT NOT NULL,
+  expires_at DATETIME NOT NULL,
+  revoked_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_admin_sessions_admin (admin_id)
+) ENGINE=InnoDB;
+```
+
+- Admin: cookie HttpOnly `nexxo_admin` (token opaco; en BD solo su SHA-256). Postulante: cookie firmada `nexxo_cand`.
+- Rutas nuevas: `POST /api/auth/logout`, `POST /api/candidates/session` (canje del magic link), `GET /api/candidates/me`.
+- Retiradas: `GET /api/candidates/access/:token`, credenciales admin por `?token=` y `Authorization: Bearer`, `?candidate_token=` en `/api/files/:filename`, cookie `admin_token` y el JWT en la respuesta de `POST /api/auth/admin-login`.
+- `POST /api/candidates/:id/phase2-acreditacion` ahora exige cookie `nexxo_cand` del mismo id.
+- Logs del simulador de correo enmascaran el token del magic link.

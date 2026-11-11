@@ -65,25 +65,16 @@
   </div>
 
   <script>
-    // Si ya existe un token en memoria, verificar si sigue vigente
-    const existingToken = sessionStorage.getItem('nexxo_admin_token');
-    if (existingToken) {
-      fetch('/api/auth/verify', {
-        headers: { 'Authorization': 'Bearer ' + existingToken }
+    // Limpiar restos de versiones anteriores (la sesión ahora vive en una cookie HttpOnly)
+    sessionStorage.removeItem('nexxo_admin_token');
+    sessionStorage.removeItem('nexxo_admin_user');
+
+    // Si ya existe una sesión vigente (cookie), ir directo al panel
+    fetch('/api/auth/verify', { credentials: 'same-origin' })
+      .then(res => {
+        if (res.ok) window.location.replace('/admin');
       })
-      .then(res => res.json())
-      .then(data => {
-        if (data.valid) {
-          window.location.replace('/admin');
-        } else {
-          sessionStorage.removeItem('nexxo_admin_token');
-          sessionStorage.removeItem('nexxo_admin_user');
-        }
-      })
-      .catch(() => {
-        sessionStorage.removeItem('nexxo_admin_token');
-      });
-    }
+      .catch(() => {});
 
     const form = document.getElementById('form-login');
     const errorBanner = document.getElementById('login-error');
@@ -103,6 +94,7 @@
         const res = await fetch('/api/auth/admin-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ username, password })
         });
 
@@ -112,10 +104,7 @@
           throw new Error(data.error || 'Credenciales inválidas.');
         }
 
-        // Guardar sesión en sessionStorage
-        sessionStorage.setItem('nexxo_admin_token', data.token);
-        sessionStorage.setItem('nexxo_admin_user', JSON.stringify(data.user));
-
+        // La sesión queda en la cookie HttpOnly emitida por el servidor.
         // Redireccionar al panel de administración
         window.location.replace('/admin');
       } catch (err) {

@@ -17,6 +17,10 @@ function generateAccessToken(validDays = 7) {
   return { token, expiresAt };
 }
 
+// Enmascara el token del magic link para logs (solo origen + 6 primeros caracteres)
+const maskMagicLink = (link) =>
+  String(link || "").replace(/token=([^&#]{0,6})[^&#]*/, "token=$1…");
+
 /**
  * Retorna el transporte SMTP configurado o null si no hay credenciales
  */
@@ -168,7 +172,7 @@ async function sendPhase2InvitationEmail({
   console.log(
     ` Asunto:    [NEXXO S.A.] Aprobación de Acceso a Faena - Convocatoria El Teniente`,
   );
-  console.log(` Enlace:    ${magic_link}`);
+  console.log(` Enlace:    ${maskMagicLink(magic_link)}`);
   console.log(` Expiración: ${formattedDate}`);
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.log(

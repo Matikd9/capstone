@@ -1375,18 +1375,41 @@ document.addEventListener("DOMContentLoaded", () => {
   async function checkAccessTokenAndResume() {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get("token");
-    if (!token) return;
 
     try {
-      const res = await fetch(
-        `/api/candidates/access/${encodeURIComponent(token)}`,
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        alert(
-          `[ACCESO A FAENA NO AUTORIZADO]\n\n${data.error || "El enlace no es válido o requiere aprobación de faena previa por parte de RR.HH."}`,
+      let res;
+      let data;
+      if (token) {
+        // Canjear el magic link por una cookie HttpOnly de sesión y retirarlo de la URL
+        res = await fetch("/api/candidates/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ token }),
+        });
+        urlParams.delete("token");
+        const remainingQuery = urlParams.toString();
+        history.replaceState(
+          null,
+          "",
+          window.location.pathname +
+            (remainingQuery ? `?${remainingQuery}` : "") +
+            window.location.hash,
         );
-        return;
+        data = await res.json();
+        if (!res.ok) {
+          alert(
+            `[ACCESO A FAENA NO AUTORIZADO]\n\n${data.error || "El enlace no es válido o requiere aprobación de faena previa por parte de RR.HH."}`,
+          );
+          return;
+        }
+      } else {
+        // Reanudar una sesión de Fase 2 existente (cookie); visitante normal si no hay sesión
+        res = await fetch("/api/candidates/me", {
+          credentials: "same-origin",
+        }).catch(() => null);
+        if (!res || !res.ok) return;
+        data = await res.json();
       }
 
       state.candidateId = data.id;
@@ -1509,9 +1532,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Medida de Seguridad: Si quien abre el enlace es un Administrador con sesión activa
-      const isAdminSession = Boolean(
-        sessionStorage.getItem("nexxo_admin_token"),
-      );
+      const adminCheck = await fetch("/api/auth/verify", {
+        credentials: "same-origin",
+      }).catch(() => null);
+      const isAdminSession = Boolean(adminCheck && adminCheck.ok);
       if (isAdminSession) {
         const adminWarningBanner = document.createElement("div");
         adminWarningBanner.className = "ocr-banner ocr-banner-warning";

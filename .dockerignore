@@ -2,7 +2,9 @@ node_modules
 .git
 .devcontainer
 .env
-.env.example
+.env.*
 Attachments
+public/uploads
+storage/uploads
 npm-debug.log
 .DS_Store

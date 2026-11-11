@@ -79,7 +79,18 @@ const loginRateLimiter = rateLimit({
 // Aumentar límites para transferencia de documentos y fotos
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-app.use(express.static(path.join(__dirname, "../public")));
+// public/uploads (archivos legacy) nunca se sirve como estático: solo vía /uploads/:filename, con autenticación.
+const publicStatic = express.static(path.join(__dirname, "../public"));
+app.use((req, res, next) => {
+  let p;
+  try {
+    p = path.posix.normalize(decodeURIComponent(req.path).replace(/\\/g, "/"));
+  } catch (e) {
+    return res.status(400).end();
+  }
+  if (/^\/uploads(\/|$)/i.test(p)) return next();
+  publicStatic(req, res, next);
+});
 
 // Aplicar Rate Limiting a rutas de API y autenticación
 app.use("/api/", generalApiLimiter);

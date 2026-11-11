@@ -228,9 +228,15 @@
           "#fff1e8"
         ]
       },
+      "stripe": {
+        "role": "secondary",
+        "displayName": "Reflective Tape White",
+        "canonical": "#ffffff",
+        "cssVar": "--stripe"
+      },
       "reflect": {
         "role": "secondary",
-        "displayName": "Retroreflective Silver",
+        "displayName": "Silver",
         "canonical": "#c7ccd2",
         "cssVar": "--reflect",
         "tonalRamp": [
@@ -546,7 +552,7 @@
       {
         "name": "reflective-strip",
         "value": "inset 0 -5px 0 #c7ccd2",
-        "purpose": "Silver base strip of the primary button (3px pressed, 4px small). Tape, not elevation."
+        "purpose": "White tape line inside the primary button bottom edge (inset hivis 5px over stripe 8px). Tape, not elevation."
       }
     ],
     "motion": [
@@ -604,8 +610,8 @@
       }
     ],
     "signatureStripe": {
-      "horizontal": "linear-gradient(to bottom, hivis 0 9%, reflect 9% 17%, hivis 17% 83%, reflect 83% 91%, hivis 91%)",
-      "vertical": "linear-gradient(to right, reflect 0 28%, transparent 28% 72%, reflect 72%) on an 18px band over graphite (login)"
+      "horizontal": "linear-gradient(to bottom, hivis 0 9%, stripe 9% 17%, hivis 17% 83%, stripe 83% 91%, hivis 91%)",
+      "vertical": "linear-gradient(to right, stripe 0 28%, transparent 28% 72%, stripe 72%) on an 18px band over graphite (login)"
     }
   },
   "components": [
@@ -613,7 +619,7 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The single action that advances; hi-vis fill with a silver reflective base strip. One per view.",
+      "description": "The single action that advances; hi-vis fill with a white reflective tape line. One per view.",
       "html": "<button class=\"ds-btn ds-btn-primary\">Continuar a evaluación técnica</button>",
       "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 0 20px; border: 1px solid transparent; border-radius: var(--radius, 6px); font-family: var(--font, 'Archivo', system-ui, sans-serif); font-size: 1rem; font-weight: 700; line-height: 1.2; cursor: pointer; transition: background-color 0.15s cubic-bezier(0.16,1,0.3,1), box-shadow 0.15s cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary { padding-bottom: 5px; background: var(--hivis, #ff6a13); color: var(--hivis-ink, #1c232d); box-shadow: inset 0 -5px 0 var(--reflect, #c7ccd2); } .ds-btn-primary:hover { background: var(--hivis-deep, #e05a0a); } .ds-btn-primary:active { box-shadow: inset 0 -3px 0 var(--reflect, #c7ccd2); } .ds-btn-primary:focus-visible { outline: 2px solid var(--hivis, #ff6a13); outline-offset: 2px; }"
     },
@@ -645,7 +651,7 @@
       "name": "Phase Band",
       "kind": "nav",
       "refersTo": "phase-segment-active",
-      "description": "Signature: the active phase wears hi-vis orange with a hard-stop double silver stripe and a one-time sheen.",
+      "description": "Signature: the active phase wears hi-vis orange with a hard-stop double white stripe and a one-time sheen.",
       "html": "<ol class=\"ds-band\"><li class=\"ds-seg ds-done\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"20 6 9 17 4 12\"/></svg><span class=\"ds-seg-text\">Datos y documentos</span></li><li class=\"ds-seg ds-active\"><span class=\"ds-seg-num\">1.5</span><span class=\"ds-seg-text\">Evaluación técnica</span></li><li class=\"ds-seg\"><span class=\"ds-seg-num\">2</span><span class=\"ds-seg-text\">Acreditación</span></li></ol>",
       "css": ".ds-band { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); height: 76px; margin: 0; padding: 0; list-style: none; background: var(--ink-2, #2a3340); } .ds-seg { position: relative; display: flex; align-items: center; gap: 14px; padding: 0 24px; overflow: hidden; color: var(--reflect-dim, #9aa3ad); border-left: 1px solid rgba(199,204,210,0.14); } .ds-seg:first-child { border-left: 0; } .ds-seg-num { font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 2.125rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; } .ds-seg-text { font-family: var(--font-narrow, 'Archivo Narrow', sans-serif); font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; } .ds-done { color: var(--reflect-hi, #eef1f4); } .ds-done svg { color: var(--ok-on-dark, #86d6a6); flex: none; } .ds-done .ds-seg-text { font-weight: 500; } .ds-active { color: var(--hivis-ink, #1c232d); border-color: transparent; background: linear-gradient(to bottom, var(--hivis, #ff6a13) 0 9%, var(--reflect, #c7ccd2) 9% 17%, var(--hivis, #ff6a13) 17% 83%, var(--reflect, #c7ccd2) 83% 91%, var(--hivis, #ff6a13) 91%); } .ds-active::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.6) 50%, transparent 70%); transform: translateX(-110%); animation: ds-sheen 700ms cubic-bezier(0.16,1,0.3,1) 150ms 1 both; } @keyframes ds-sheen { to { transform: translateX(110%); } } @media (prefers-reduced-motion: reduce) { .ds-active::after { display: none; } }"
     },
@@ -676,7 +682,7 @@
   ],
   "narrative": {
     "northStar": "Alta Visibilidad",
-    "overview": "The interface dresses like the worker's own personal protective equipment. A graphite shell bar carries the logo on a white plate; below it the page floor is a cold light grey and every working surface is white with a 1px hairline. Against that quiet field, one thing glows: a fluorescent orange band crossed by a double silver retroreflective stripe, worn only by whatever is active right now: the current phase, the one action that advances, the focus ring. Statuses speak the hard-hat code of a mining site (green conforme, red descarte, amber revisión, blue en curso, grey pendiente), each one an explicit mark with a square swatch and an uppercase narrow label.\n\nDensity follows the reader. The applicant portal is generous and touch-first (48px fields and buttons, 56px option cards, a 352px rail explaining why each document is asked for). The RR.HH. panel is a high-density module board: a five-cell metrics strip split by hairlines, a sticky-header matrix with 48px rows grouped action-first, and a right-hand drawer that opens the file without losing the matrix. Motion is brief and literal: a sheen crosses the reflective stripe when a phase activates, like headlights sweeping a vest, and a state cell flips like a split-flap board when it changes. Both stand down under reduced motion.\n\nThe system rejects the grey SaaS portal with a blue stepper and the earlier yellow-and-black hazard-stripe look. No gradients for atmosphere, no glass, no blur.",
+    "overview": "The interface dresses like the worker's own personal protective equipment. A graphite shell bar carries the logo on a white plate; below it the page floor is a cold light grey and every working surface is white with a 1px hairline. Against that quiet field, one thing glows: a fluorescent orange band crossed by a double white retroreflective stripe, worn only by whatever is active right now: the current phase, the one action that advances, the focus ring. Statuses speak the hard-hat code of a mining site (green conforme, red descarte, amber revisión, blue en curso, grey pendiente), each one an explicit mark with a square swatch and an uppercase narrow label.\n\nDensity follows the reader. The applicant portal is generous and touch-first (48px fields and buttons, 56px option cards, a 352px rail explaining why each document is asked for). The RR.HH. panel is a high-density module board: a five-cell metrics strip split by hairlines, a sticky-header matrix with 48px rows grouped action-first, and a right-hand drawer that opens the file without losing the matrix. Motion is brief and literal: a sheen crosses the reflective stripe when a phase activates, like headlights sweeping a vest, and a state cell flips like a split-flap board when it changes. Both stand down under reduced motion.\n\nThe system rejects the grey SaaS portal with a blue stepper and the earlier yellow-and-black hazard-stripe look. No gradients for atmosphere, no glass, no blur.",
     "keyCharacteristics": [
       "Fluorescent orange is reserved; the reflective double stripe is the signature of \"active\".",
       "Hard-hat state code for every status, always as an explicit labelled mark.",
@@ -713,7 +719,7 @@
     ],
     "dos": [
       "**Do** keep hivis to the current phase, the one primary action, the focus ring and the user's current selection; text on it is graphite.",
-      "**Do** draw the reflective stripe as hard-stop silver bands (9 to 17% and 83 to 91% on horizontal bands; flat vertical bands on the login panel), never as a soft gradient.",
+      "**Do** draw the reflective stripe as hard-stop white bands (9 to 17% and 83 to 91% on horizontal bands; flat vertical bands on the login panel), never as a soft gradient.",
       "**Do** show every status as a labelled hard-hat mark: square swatch, Narrow caps label, text colour on its own tint.",
       "**Do** strike through the label of an unavailable button, and keep loading buttons (spinner) and the drawer's current-state button (positive \"Estado actual\" tag) unstruck.",
       "**Do** set every comparable number in tabular numerals, and labels in Archivo Narrow caps.",

@@ -109,7 +109,7 @@ DB_SSL=false
 
 # Seguridad Administrativa
 JWT_SECRET=dev-jwt-secret-key-capstone-2026
-ADMIN_DEFAULT_PASSWORD=papa123
+ADMIN_DEFAULT_PASSWORD=cambia-esta-clave-local
 
 # Opcionales (Gemini OCR y SMTP)
 GEMINI_API_KEY=
@@ -151,7 +151,7 @@ docker compose down
 
 ### Credenciales de Operador RR.HH. por Defecto (Local)
 * **Usuario:** `admin`
-* **Contraseña:** Configurada en `ADMIN_DEFAULT_PASSWORD` de tu `.env` (por defecto `papa123`).
+* **Contraseña:** Configurada en `ADMIN_DEFAULT_PASSWORD` de tu `.env` (defínela tú; no existe valor por defecto en producción).
 
 ---
 

@@ -21,18 +21,24 @@ function generateAccessToken(validDays = 7) {
 const maskMagicLink = (link) =>
   String(link || "").replace(/token=([^&#]{0,6})[^&#]*/, "token=$1…");
 
+// Aviso único por proceso cuando faltan credenciales SMTP en producción
+let smtpMissingWarned = false;
+
 /**
  * Retorna el transporte SMTP configurado o null si no hay credenciales
  */
 function getMailTransporter() {
-  const isProduction = process.env.NODE_ENV === "production";
-  const defaultUser = isProduction ? "REMOVED" : null;
-  const defaultPass = isProduction ? "REMOVED" : null;
-
-  const user = process.env.SMTP_USER || defaultUser;
-  const pass = process.env.SMTP_PASS || defaultPass;
+  // Credenciales SMTP solo desde variables de entorno (Cloud Run / Secret Manager), nunca en el código
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
 
   if (!user || !pass || user.trim() === "" || pass.trim() === "") {
+    if (process.env.NODE_ENV === "production" && !smtpMissingWarned) {
+      smtpMissingWarned = true;
+      console.warn(
+        "[MAILER] SMTP_USER/SMTP_PASS no configurados en producción: los correos no se enviarán (modo simulador).",
+      );
+    }
     return null;
   }
 
@@ -237,11 +243,7 @@ async function sendPhase2InvitationEmail({
   const transporter = getMailTransporter();
   if (transporter) {
     try {
-      const senderUser =
-        process.env.SMTP_USER ||
-        (process.env.NODE_ENV === "production"
-          ? "REMOVED"
-          : "");
+      const senderUser = process.env.SMTP_USER.trim();
       const fromAddress =
         process.env.SMTP_FROM || `"Nexxo S.A. Acreditaciones" <${senderUser}>`;
       const mailOptions = {
@@ -349,11 +351,7 @@ async function sendHiredConfirmationEmail({ email, full_name, position_name }) {
   const transporter = getMailTransporter();
   if (transporter) {
     try {
-      const senderUser =
-        process.env.SMTP_USER ||
-        (process.env.NODE_ENV === "production"
-          ? "REMOVED"
-          : "");
+      const senderUser = process.env.SMTP_USER.trim();
       const fromAddress =
         process.env.SMTP_FROM || `"Nexxo S.A. Acreditaciones" <${senderUser}>`;
       const mailOptions = {

@@ -12,17 +12,38 @@ const KNOWN_WEAK_JWT_SECRETS = [
   "dev-jwt-secret-nexxo-2026-local",
   "dev-jwt-secret-key-capstone-2026",
 ];
+const JWT_SECRET_HINT =
+  "Genera uno con: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"";
+if (!process.env.JWT_SECRET) {
+  throw new Error(`JWT_SECRET no está configurado. ${JWT_SECRET_HINT}`);
+}
 if (
   process.env.NODE_ENV === "production" &&
-  (!process.env.JWT_SECRET ||
-    process.env.JWT_SECRET.length < 32 ||
+  (process.env.JWT_SECRET.length < 32 ||
     KNOWN_WEAK_JWT_SECRETS.includes(process.env.JWT_SECRET))
 ) {
   throw new Error(
-    "JWT_SECRET ausente, débil o público en producción (mínimo 32 caracteres). Genera uno con: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",
+    `JWT_SECRET débil o público en producción (mínimo 32 caracteres). ${JWT_SECRET_HINT}`,
   );
 }
-const JWT_SECRET = process.env.JWT_SECRET || "dev-jwt-secret-nexxo-2026";
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Contraseñas públicas (están en GitHub): nunca válidas para el usuario admin.
+const KNOWN_WEAK_ADMIN_PASSWORDS = [
+  "papa123",
+  "rootpassword",
+  "admin",
+  "admin123",
+  "cambia-esta-clave-local",
+];
+
+function isStrongAdminPassword(pw) {
+  return (
+    typeof pw === "string" &&
+    pw.length >= 12 &&
+    !KNOWN_WEAK_ADMIN_PASSWORDS.includes(pw)
+  );
+}
 const TOKEN_EXPIRY_SECONDS = 8 * 60 * 60; // 8 horas (Jornada laboral completa)
 
 /**
@@ -47,6 +68,7 @@ function verifyPassword(password, storedHash) {
   const [salt, key] = storedHash.split(":");
   const keyBuffer = Buffer.from(key, "hex");
   const derivedKey = crypto.scryptSync(password, salt, 64);
+  if (keyBuffer.length !== derivedKey.length) return false;
   return crypto.timingSafeEqual(keyBuffer, derivedKey);
 }
 
@@ -268,7 +290,9 @@ function getCandidateIdFromRequest(req) {
 }
 
 /**
- * Inicializa la tabla admin_users y asegura el usuario por defecto admin / papa123
+ * Inicializa admin_users/admin_sessions y crea el usuario "admin" con ADMIN_DEFAULT_PASSWORD
+ * (en producción solo si es fuerte). Si el admin existente usa una contraseña predeterminada
+ * conocida, la rota a ADMIN_DEFAULT_PASSWORD cuando esta es fuerte; si no, solo avisa.
  */
 async function initAdminAuth(pool) {
   authPool = pool;
@@ -298,24 +322,41 @@ async function initAdminAuth(pool) {
 
     // Comprobar si existe el usuario 'admin'
     const [rows] = await conn.query(
-      "SELECT id FROM admin_users WHERE username = ?",
+      "SELECT id, password_hash FROM admin_users WHERE username = ?",
       ["admin"],
     );
-    if (rows.length === 0) {
-      const defaultPassword =
-        process.env.ADMIN_DEFAULT_PASSWORD ||
-        (process.env.NODE_ENV === "production" ? "" : "papa123");
-      // Solo se valida al CREAR el usuario; en producción exige clave real (no pública, mínimo 12).
-      if (
-        process.env.NODE_ENV === "production" &&
-        (defaultPassword.length < 12 ||
-          ["papa123", "rootpassword"].includes(defaultPassword))
-      ) {
-        throw new Error(
-          "ADMIN_DEFAULT_PASSWORD ausente o débil en producción (mínimo 12 caracteres) y el usuario admin aún no existe.",
+    const envPassword = process.env.ADMIN_DEFAULT_PASSWORD;
+    if (rows.length > 0) {
+      const isDefault = KNOWN_WEAK_ADMIN_PASSWORDS.some((p) =>
+        verifyPassword(p, rows[0].password_hash),
+      );
+      if (isDefault && isStrongAdminPassword(envPassword)) {
+        await conn.query(
+          "UPDATE admin_users SET password_hash = ? WHERE username = 'admin'",
+          [hashPassword(envPassword)],
+        );
+        await conn.query(
+          "UPDATE admin_sessions SET revoked_at = NOW() WHERE admin_id = ? AND revoked_at IS NULL",
+          [rows[0].id],
+        );
+        console.log(
+          "[AUTH] Contraseña predeterminada del usuario admin reemplazada por ADMIN_DEFAULT_PASSWORD; sesiones previas revocadas.",
+        );
+      } else if (isDefault) {
+        console.warn(
+          "[AUTH] ADVERTENCIA: el usuario admin usa una contraseña predeterminada conocida. Configure ADMIN_DEFAULT_PASSWORD (12+ caracteres) y reinicie para rotarla.",
         );
       }
-      const defaultHash = hashPassword(defaultPassword);
+    } else if (
+      !envPassword ||
+      (process.env.NODE_ENV === "production" &&
+        !isStrongAdminPassword(envPassword))
+    ) {
+      console.warn(
+        "[AUTH] Usuario admin no creado: configure ADMIN_DEFAULT_PASSWORD con 12+ caracteres no predeterminados y reinicie.",
+      );
+    } else {
+      const defaultHash = hashPassword(envPassword);
       await conn.query(
         `
         INSERT INTO admin_users (username, password_hash, full_name, role)

@@ -108,8 +108,8 @@ DB_NAME=web_app
 DB_SSL=false
 
 # Seguridad Administrativa
-JWT_SECRET=dev-jwt-secret-key-capstone-2026
-ADMIN_DEFAULT_PASSWORD=cambia-esta-clave-local
+JWT_SECRET=<genera uno: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))">
+ADMIN_DEFAULT_PASSWORD=<12+ caracteres>
 
 # Opcionales (Gemini OCR y SMTP)
 GEMINI_API_KEY=
@@ -151,7 +151,7 @@ docker compose down
 
 ### Credenciales de Operador RR.HH. por Defecto (Local)
 * **Usuario:** `admin`
-* **Contraseña:** Configurada en `ADMIN_DEFAULT_PASSWORD` de tu `.env` (defínela tú; no existe valor por defecto en producción).
+* **Contraseña:** Configurada en `ADMIN_DEFAULT_PASSWORD` de tu `.env` (la clave que definas ahí).
 
 ---
 
@@ -203,4 +203,5 @@ El repositorio incluye un [Dockerfile](Dockerfile) optimizado para despliegues e
    - `DB_SSL`: `true`
    - `JWT_SECRET`: Secreto criptográfico de alta entropía
    - `ADMIN_DEFAULT_PASSWORD`: Clave para el primer inicio de sesión admin
+   - `SMTP_USER` / `SMTP_PASS`: Credenciales SMTP para el envío de correos (nunca en el código)
    - `PORT`: `8080` (predeterminado para Cloud Run)

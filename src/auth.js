@@ -5,11 +5,24 @@
 
 const crypto = require("crypto");
 
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  (process.env.NODE_ENV === "production"
-    ? "super_secret_jwt_key_here"
-    : "dev-jwt-secret-nexxo-2026");
+// Valores públicos (están en GitHub): jamás aceptables como secreto en producción.
+const KNOWN_WEAK_JWT_SECRETS = [
+  "super_secret_jwt_key_here",
+  "dev-jwt-secret-nexxo-2026",
+  "dev-jwt-secret-nexxo-2026-local",
+  "dev-jwt-secret-key-capstone-2026",
+];
+if (
+  process.env.NODE_ENV === "production" &&
+  (!process.env.JWT_SECRET ||
+    process.env.JWT_SECRET.length < 32 ||
+    KNOWN_WEAK_JWT_SECRETS.includes(process.env.JWT_SECRET))
+) {
+  throw new Error(
+    "JWT_SECRET ausente, débil o público en producción (mínimo 32 caracteres). Genera uno con: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",
+  );
+}
+const JWT_SECRET = process.env.JWT_SECRET || "dev-jwt-secret-nexxo-2026";
 const TOKEN_EXPIRY_SECONDS = 8 * 60 * 60; // 8 horas (Jornada laboral completa)
 
 /**
@@ -289,7 +302,19 @@ async function initAdminAuth(pool) {
       ["admin"],
     );
     if (rows.length === 0) {
-      const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || "papa123";
+      const defaultPassword =
+        process.env.ADMIN_DEFAULT_PASSWORD ||
+        (process.env.NODE_ENV === "production" ? "" : "papa123");
+      // Solo se valida al CREAR el usuario; en producción exige clave real (no pública, mínimo 12).
+      if (
+        process.env.NODE_ENV === "production" &&
+        (defaultPassword.length < 12 ||
+          ["papa123", "rootpassword"].includes(defaultPassword))
+      ) {
+        throw new Error(
+          "ADMIN_DEFAULT_PASSWORD ausente o débil en producción (mínimo 12 caracteres) y el usuario admin aún no existe.",
+        );
+      }
       const defaultHash = hashPassword(defaultPassword);
       await conn.query(
         `

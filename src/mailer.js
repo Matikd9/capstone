@@ -51,6 +51,140 @@ function getMailTransporter() {
   });
 }
 
+/* ==========================================================================
+   Plantilla HTML de correos — sistema visual "Alta Visibilidad" (DESIGN.md)
+   Tablas + estilos en línea para compatibilidad con Gmail/Outlook.
+   Naranja flúor solo en la banda de fase y en el botón de acción; franjas
+   blancas como cinta reflectante; estados con el código de color de casco.
+   ========================================================================== */
+const EMAIL = {
+  font: "'Archivo', Arial, Helvetica, sans-serif",
+  ink: "#1c232d",
+  text2: "#4a5562",
+  text3: "#626c78",
+  ground: "#eef0f2",
+  line: "#d5d9de",
+  hivis: "#ff6a13",
+  stripe: "#ffffff",
+  reflect: "#c7ccd2",
+  ok: "#1f7a48",
+  okTint: "#e7f4ec",
+  okLine: "#9fd1b3",
+};
+
+function escapeEmailHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getOriginFromLink(link) {
+  try {
+    return new URL(link).origin;
+  } catch {
+    return null;
+  }
+}
+
+function emailParagraph(html, size = 15) {
+  return `<p style="margin:0 0 16px 0;font-family:${EMAIL.font};font-size:${size}px;line-height:1.6;color:${EMAIL.text2};">${html}</p>`;
+}
+
+function emailStrong(text) {
+  return `<strong style="color:${EMAIL.ink};font-weight:700;">${text}</strong>`;
+}
+
+function emailStatusPill(label) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr>
+      <td style="background:${EMAIL.okTint};border:1px solid ${EMAIL.okLine};border-radius:4px;padding:6px 10px;font-family:${EMAIL.font};font-size:12px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:${EMAIL.ok};">
+        <span style="display:inline-block;width:8px;height:8px;background:${EMAIL.ok};margin-right:6px;vertical-align:1px;"></span>${label}
+      </td></tr></table>`;
+}
+
+function emailFacts(rows) {
+  const cells = rows
+    .map(
+      ([label, value], i) => `<tr>
+        <td style="padding:12px 0;${i ? `border-top:1px solid ${EMAIL.line};` : ""}">
+          <div style="font-family:${EMAIL.font};font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${EMAIL.text3};">${label}</div>
+          <div style="font-family:${EMAIL.font};font-size:15px;font-weight:600;line-height:1.4;color:${EMAIL.ink};padding-top:3px;">${value}</div>
+        </td></tr>`,
+    )
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${EMAIL.line};border-bottom:1px solid ${EMAIL.line};margin:8px 0 24px 0;">${cells}</table>`;
+}
+
+// Botón "a prueba de clientes": naranja con cinta blanca en su borde inferior.
+function emailButton(href, label) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:8px 0 16px 0;">
+      <tr><td bgcolor="${EMAIL.hivis}" style="background:${EMAIL.hivis};border-radius:6px 6px 0 0;padding:16px 28px 13px 28px;">
+        <a href="${href}" target="_blank" style="font-family:${EMAIL.font};font-size:16px;font-weight:800;color:${EMAIL.ink};text-decoration:none;display:inline-block;">${label}&nbsp;&rarr;</a>
+      </td></tr>
+      <tr><td bgcolor="${EMAIL.stripe}" height="3" style="background:${EMAIL.stripe};height:3px;line-height:3px;font-size:0;">&nbsp;</td></tr>
+      <tr><td bgcolor="${EMAIL.hivis}" height="5" style="background:${EMAIL.hivis};height:5px;line-height:5px;font-size:0;border-radius:0 0 6px 6px;">&nbsp;</td></tr>
+    </table>`;
+}
+
+function renderEmailLayout({
+  preheader,
+  logoUrl,
+  phaseNumber,
+  phaseLabel,
+  bodyHtml,
+  footerHtml,
+}) {
+  const logo = logoUrl
+    ? `<img src="${logoUrl}/logo-nexxo.png" width="96" alt="Nexxo S.A." style="display:block;width:96px;height:auto;border:0;">`
+    : `<span style="font-family:${EMAIL.font};font-size:18px;font-weight:800;letter-spacing:0.02em;color:#143c6b;">NEXXO</span>`;
+  const stripeRow = (h, color) =>
+    `<tr><td bgcolor="${color}" height="${h}" style="background:${color};height:${h}px;line-height:${h}px;font-size:0;">&nbsp;</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <title>Nexxo S.A.</title>
+</head>
+<body style="margin:0;padding:0;background:${EMAIL.ground};">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${EMAIL.ground}" style="background:${EMAIL.ground};">
+    <tr><td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-collapse:collapse;">
+        <tr><td bgcolor="${EMAIL.ink}" style="background:${EMAIL.ink};padding:16px 24px;border-radius:10px 10px 0 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="width:1%;white-space:nowrap;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#ffffff" style="background:#ffffff;border-radius:4px;padding:6px 10px;">${logo}</td></tr></table></td>
+            <td align="right" style="font-family:${EMAIL.font};font-size:13px;color:${EMAIL.reflect};padding-left:16px;">División El Teniente · Codelco Chile</td>
+          </tr></table>
+        </td></tr>
+        <tr><td style="padding:0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+            ${stripeRow(5, EMAIL.hivis)}${stripeRow(3, EMAIL.stripe)}
+            <tr><td bgcolor="${EMAIL.hivis}" style="background:${EMAIL.hivis};padding:8px 24px;font-family:${EMAIL.font};color:${EMAIL.ink};">
+              <span style="font-size:26px;font-weight:800;vertical-align:middle;">${phaseNumber}</span>
+              <span style="font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;vertical-align:middle;padding-left:10px;">${phaseLabel}</span>
+            </td></tr>
+            ${stripeRow(3, EMAIL.stripe)}${stripeRow(5, EMAIL.hivis)}
+          </table>
+        </td></tr>
+        <tr><td bgcolor="#ffffff" style="background:#ffffff;padding:32px 32px 16px 32px;border-left:1px solid ${EMAIL.line};border-right:1px solid ${EMAIL.line};">
+          ${bodyHtml}
+        </td></tr>
+        <tr><td bgcolor="${EMAIL.ink}" style="background:${EMAIL.ink};padding:20px 32px;border-radius:0 0 10px 10px;font-family:${EMAIL.font};font-size:12px;line-height:1.6;color:${EMAIL.reflect};">
+          ${footerHtml}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 /**
  * Despacha el correo de invitación a Fase 2 (Validación Documental)
  * Envía correo real si SMTP_USER y SMTP_PASS están en .env; de lo contrario simula en consola.
@@ -70,60 +204,34 @@ async function sendPhase2InvitationEmail({
       ? expires_at.toLocaleDateString("es-CL")
       : "7 días";
 
-  const htmlContent = `
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #F8FAFC; color: #526173; margin: 0; padding: 24px; }
-    .container { max-width: 600px; margin: 0 auto; background: #FFFFFF; border: 1px solid #DDE3EA; border-top: 4px solid #0F2942; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.05); padding: 32px; }
-    .accent-line { height: 3px; background-color: #F5A623; margin-bottom: 20px; border-radius: 2px; }
-    .header { border-bottom: 1px solid #DDE3EA; padding-bottom: 20px; margin-bottom: 24px; }
-    .badge { display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px; }
-    h1 { font-size: 18px; margin: 12px 0 0 0; color: #0F2942; font-weight: 700; letter-spacing: 0.02em; }
-    p { font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0; }
-    .highlight { color: #0F2942; font-weight: 700; }
-    .action-box { background-color: #F8FAFC; border: 1px solid #DDE3EA; border-radius: 6px; padding: 24px; text-align: center; margin: 24px 0; }
-    .btn { display: inline-block; background-color: #0F2942; color: #FFFFFF !important; border: none; border-radius: 8px; font-weight: 600; padding: 14px 28px; text-decoration: none; font-size: 14px; }
-    .btn:hover { background-color: #1A3E61; }
-    .link-alt { font-size: 12px; word-break: break-all; color: #526173; margin-top: 16px; }
-    .footer { border-top: 1px solid #DDE3EA; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #526173; line-height: 1.5; }
-  </style>
-</head>
-<body style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #F8FAFC; color: #526173; margin: 0; padding: 24px;">
-  <div class="container" style="max-width: 600px; margin: 0 auto; background: #FFFFFF; border: 1px solid #DDE3EA; border-top: 4px solid #0F2942; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.05); padding: 32px;">
-    <div class="accent-line" style="height: 3px; background-color: #F5A623; margin-bottom: 20px; border-radius: 2px;"></div>
-    <div class="header" style="border-bottom: 1px solid #DDE3EA; padding-bottom: 20px; margin-bottom: 24px;">
-      <span class="badge" style="display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px;">ACCESO A FAENA APROBADO</span>
-      <h1 style="font-size: 18px; margin: 12px 0 0 0; color: #0F2942; font-weight: 700; letter-spacing: 0.02em;">Nexxo S.A. — División El Teniente (Codelco)</h1>
-    </div>
+  const safeName = escapeEmailHtml(candidateName);
+  const safeRole = escapeEmailHtml(roleName);
+  const safeLink = escapeEmailHtml(magic_link);
 
-    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Estimado/a <strong style="color: #0F2942;">${candidateName}</strong>,</p>
-    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Le informamos que su evaluación técnica para el cargo de <span class="highlight" style="color: #0F2942; font-weight: 700;">${roleName}</span> ha sido <strong style="color: #0F2942;">APROBADA</strong> por el equipo de Reclutamiento y Acreditación de Nexxo S.A.</p>
-    
-    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Ha sido seleccionado para ingresar a la dotación de parada de planta. Para conformar su <strong style="color: #0F2942;">Carpeta de Acreditación WebControl Codelco</strong>, debe ingresar al siguiente enlace exclusivo para cargar su <strong style="color: #0F2942;">Cédula de Identidad</strong> y <strong style="color: #0F2942;">Certificado de Antecedentes para Fines Especiales</strong>:</p>
-
-    <div class="action-box" style="background-color: #F8FAFC; border: 1px solid #DDE3EA; border-radius: 6px; padding: 24px; text-align: center; margin: 24px 0;">
-      <a href="${magic_link}" class="btn" target="_blank" style="display: inline-block; background-color: #0F2942; color: #FFFFFF !important; border: none; border-radius: 8px; font-weight: 600; padding: 14px 28px; text-decoration: none; font-size: 14px;">INGRESAR A FASE 02: VALIDACIÓN DOCUMENTAL</a>
-      <div class="link-alt" style="font-size: 12px; word-break: break-all; color: #526173; margin-top: 16px;">
-        O copie y pegue esta URL en su navegador:<br>
-        <a href="${magic_link}" style="color: #0F2942; font-weight: 600; text-decoration: underline;">${magic_link}</a>
-      </div>
-    </div>
-
-    <p style="font-size: 12px; color: #526173; margin: 12px 0;">
-      <strong style="color: #0F2942;">Vigencia del enlace:</strong> Este enlace de acceso directo es personal e intransferible y tiene una validez de 7 días corridos (vence el <strong style="color: #0F2942;">${formattedDate}</strong>).
-    </p>
-
-    <div class="footer" style="border-top: 1px solid #DDE3EA; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #526173; line-height: 1.5;">
-      Nexxo S.A. | Sistema de Acreditación Industrial & Control de Acceso Codelco DS N° 132.<br>
-      En cumplimiento de la Ley N° 19.628, sus antecedentes penales solo son solicitados al contar con aprobación formal de cupo de faena.
-    </div>
-  </div>
-</body>
-</html>
-  `;
+  const htmlContent = renderEmailLayout({
+    preheader: `Su evaluación técnica para ${safeRole} fue aprobada. Cargue su documentación de Fase 2.`,
+    logoUrl: getOriginFromLink(magic_link),
+    phaseNumber: "2",
+    phaseLabel: "Acreditación · Validación documental",
+    bodyHtml: `
+      ${emailStatusPill("Acceso a faena aprobado")}
+      <h1 style="margin:16px 0 20px 0;font-family:${EMAIL.font};font-size:24px;line-height:1.2;font-weight:800;color:${EMAIL.ink};">Nexxo S.A. — División El Teniente (Codelco)</h1>
+      ${emailParagraph(`Estimado/a ${emailStrong(safeName)},`)}
+      ${emailParagraph(`Le informamos que su evaluación técnica para el cargo de ${emailStrong(safeRole)} ha sido ${emailStrong("APROBADA")} por el equipo de Reclutamiento y Acreditación de Nexxo S.A.`)}
+      ${emailParagraph(`Ha sido seleccionado para ingresar a la dotación de parada de planta. Para conformar su ${emailStrong("Carpeta de Acreditación WebControl Codelco")}, debe ingresar al siguiente enlace exclusivo para cargar su ${emailStrong("Cédula de Identidad")} y ${emailStrong("Certificado de Antecedentes para Fines Especiales")}:`)}
+      ${emailButton(safeLink, "Ingresar a Fase 2: validación documental")}
+      ${emailParagraph(`O copie y pegue esta URL en su navegador:<br><a href="${safeLink}" style="color:${EMAIL.ink};font-weight:600;text-decoration:underline;word-break:break-all;">${safeLink}</a>`, 13)}
+      ${emailFacts([
+        [
+          "Vigencia del enlace",
+          `7 días corridos · vence el ${escapeEmailHtml(formattedDate)}`,
+        ],
+        ["Uso", "Personal e intransferible"],
+      ])}
+    `,
+    footerHtml: `Nexxo S.A. | Sistema de Acreditación Industrial &amp; Control de Acceso Codelco DS N° 132.<br>
+      En cumplimiento de la Ley N° 19.628, sus antecedentes penales solo son solicitados al contar con aprobación formal de cupo de faena.`,
+  });
 
   // Intento de envío SMTP real si hay configuración
   const transporter = getMailTransporter();
@@ -200,69 +308,43 @@ async function sendHiredConfirmationEmail({ email, full_name, position_name }) {
   const candidateName = full_name || "Postulante";
   const roleName = position_name || "Especialidad Operativa";
 
-  const htmlContent = `
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #F8FAFC; color: #526173; margin: 0; padding: 24px; }
-    .container { max-width: 600px; margin: 0 auto; background: #FFFFFF; border: 1px solid #DDE3EA; border-top: 4px solid #0F2942; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.05); padding: 32px; }
-    .accent-line { height: 3px; background-color: #F5A623; margin-bottom: 20px; border-radius: 2px; }
-    .header { border-bottom: 1px solid #DDE3EA; padding-bottom: 20px; margin-bottom: 24px; }
-    .badge { display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px; }
-    h1 { font-size: 18px; margin: 12px 0 0 0; color: #0F2942; font-weight: 700; letter-spacing: 0.02em; }
-    p { font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0; }
-    .highlight { color: #0F2942; font-weight: 700; }
-    .info-box { background-color: #F8FAFC; border: 1px solid #DDE3EA; border-radius: 6px; padding: 16px; margin: 20px 0; }
-    .info-item { font-size: 13px; color: #526173; margin-bottom: 8px; }
-    .info-label { color: #526173; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; }
-    .footer { border-top: 1px solid #DDE3EA; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #526173; line-height: 1.5; }
-  </style>
-</head>
-<body style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #F8FAFC; color: #526173; margin: 0; padding: 24px;">
-  <div class="container" style="max-width: 600px; margin: 0 auto; background: #FFFFFF; border: 1px solid #DDE3EA; border-top: 4px solid #0F2942; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.05); padding: 32px;">
-    <div class="accent-line" style="height: 3px; background-color: #F5A623; margin-bottom: 20px; border-radius: 2px;"></div>
-    <div class="header" style="border-bottom: 1px solid #DDE3EA; padding-bottom: 20px; margin-bottom: 24px;">
-      <span class="badge" style="display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 4px;">ACREDITACIÓN APROBADA // ASIGNADO A PARADA</span>
-      <h1 style="font-size: 18px; margin: 12px 0 0 0; color: #0F2942; font-weight: 700; letter-spacing: 0.02em;">Nexxo S.A. — División El Teniente (Codelco)</h1>
-    </div>
+  const safeName = escapeEmailHtml(candidateName);
+  const safeRole = escapeEmailHtml(roleName);
+  const nextSteps = [
+    "Inducción de Seguridad en Faena (Obligación de Informar - ODI).",
+    "Examen Ocupacional / Batería de Altura Geográfica y ECF.",
+    "Programación de turno y entrega de Equipo de Protección Personal (EPP).",
+  ]
+    .map(
+      (step) =>
+        `<li style="margin:0 0 8px 0;font-family:${EMAIL.font};font-size:15px;line-height:1.5;color:${EMAIL.text2};">${step}</li>`,
+    )
+    .join("");
 
-    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Estimado/a <strong style="color: #0F2942;">${candidateName}</strong>,</p>
-    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">Le informamos que su expediente documental y acreditación técnica para el cargo de <span class="highlight" style="color: #0F2942; font-weight: 700;">${roleName}</span> han sido <strong style="color: #0F2942;">APROBADOS</strong> por el Departamento de Selección y Recursos Humanos de Nexxo S.A.</p>
-    
-    <div class="info-box" style="background-color: #F8FAFC; border: 1px solid #DDE3EA; border-radius: 6px; padding: 16px; margin: 20px 0;">
-      <div class="info-item" style="font-size: 13px; color: #526173; margin-bottom: 8px;">
-        <span class="info-label" style="color: #526173; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Estado:</span>
-        <span class="badge" style="display: inline-block; background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; padding: 4px 8px; font-size: 12px; font-weight: 600; border-radius: 4px; margin-left: 6px;">Acreditación Conforme y Confirmada</span>
-      </div>
-      <div class="info-item" style="font-size: 13px; color: #526173; margin-bottom: 8px;">
-        <span class="info-label" style="color: #526173; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Faena:</span>
-        <strong style="color: #0F2942; margin-left: 6px;">Codelco División El Teniente (Rancagua)</strong>
-      </div>
-      <div class="info-item" style="font-size: 13px; color: #526173; margin-bottom: 0;">
-        <span class="info-label" style="color: #526173; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Pase de Acceso:</span>
-        <span style="color: #0F2942; margin-left: 6px;">Carpeta WebControl en tramitación reglamentaria</span>
-      </div>
-    </div>
-
-    <p style="font-size: 14px; line-height: 1.6; color: #526173; margin: 12px 0;">
-      Su incorporación a la dotación operativa de parada de planta se encuentra formalizada. Durante las próximas horas, el equipo de Operaciones de Nexxo S.A. se comunicará con usted vía telefónica o correo para coordinar:
-    </p>
-    <ul style="font-size: 13px; color: #526173; line-height: 1.8; padding-left: 20px; margin: 12px 0;">
-      <li>Inducción de Seguridad en Faena (Obligación de Informar - ODI).</li>
-      <li>Examen Ocupacional / Batería de Altura Geográfica y ECF.</li>
-      <li>Programación de turno y entrega de Equipo de Protección Personal (EPP).</li>
-    </ul>
-
-    <div class="footer" style="border-top: 1px solid #DDE3EA; padding-top: 16px; margin-top: 24px; font-size: 11px; color: #526173; line-height: 1.5;">
-      Nexxo S.A. | División Operaciones & Mantenimiento Minero.<br>
-      Plataforma de Acreditación conforme a Estándares ECF Codelco y Reglamento de Seguridad Minera DS N° 132.
-    </div>
-  </div>
-</body>
-</html>
-  `;
+  const htmlContent = renderEmailLayout({
+    preheader: `Su acreditación para ${safeRole} fue aprobada y quedó asignado a la parada de planta.`,
+    logoUrl: null,
+    phaseNumber: "&#10003;",
+    phaseLabel: "Asignado a parada de planta",
+    bodyHtml: `
+      ${emailStatusPill("Acreditación aprobada · Asignado a parada")}
+      <h1 style="margin:16px 0 20px 0;font-family:${EMAIL.font};font-size:24px;line-height:1.2;font-weight:800;color:${EMAIL.ink};">Nexxo S.A. — División El Teniente (Codelco)</h1>
+      ${emailParagraph(`Estimado/a ${emailStrong(safeName)},`)}
+      ${emailParagraph(`Le informamos que su expediente documental y acreditación técnica para el cargo de ${emailStrong(safeRole)} han sido ${emailStrong("APROBADOS")} por el Departamento de Selección y Recursos Humanos de Nexxo S.A.`)}
+      ${emailFacts([
+        [
+          "Estado",
+          `<span style="color:${EMAIL.ok};">Acreditación conforme y confirmada</span>`,
+        ],
+        ["Faena", "Codelco División El Teniente (Rancagua)"],
+        ["Pase de acceso", "Carpeta WebControl en tramitación reglamentaria"],
+      ])}
+      ${emailParagraph("Su incorporación a la dotación operativa de parada de planta se encuentra formalizada. Durante las próximas horas, el equipo de Operaciones de Nexxo S.A. se comunicará con usted vía telefónica o correo para coordinar:")}
+      <ol style="margin:0 0 16px 0;padding-left:22px;">${nextSteps}</ol>
+    `,
+    footerHtml: `Nexxo S.A. | División Operaciones &amp; Mantenimiento Minero.<br>
+      Plataforma de Acreditación conforme a Estándares ECF Codelco y Reglamento de Seguridad Minera DS N° 132.`,
+  });
 
   const transporter = getMailTransporter();
   if (transporter) {

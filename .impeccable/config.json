@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "arial",
+        "files": [
+          "src/mailer.js"
+        ],
+        "createdAt": "2026-11-10T21:52:07.256Z",
+        "reason": "Claude: email clients can't load Archivo reliably; Arial/Helvetica is the required fallback in email HTML"
+      }
+    ]
+  }
+}

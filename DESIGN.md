@@ -17,6 +17,7 @@ colors:
   hivis-deep: "#e05a0a"
   hivis-tint: "#fff1e8"
   reflect: "#c7ccd2"
+  stripe: "#ffffff"
   reflect-hi: "#eef1f4"
   reflect-dim: "#9aa3ad"
   ok: "#1f7a48"
@@ -213,7 +214,7 @@ components:
 
 **Creative North Star: "Alta Visibilidad"**
 
-The interface dresses like the worker's own personal protective equipment. A graphite shell bar carries the logo on a white plate; below it the page floor is a cold light grey and every working surface is white with a 1px hairline. Against that quiet field, one thing glows: a fluorescent orange band crossed by a double silver retroreflective stripe, worn only by whatever is active right now: the current phase, the one action that advances, the focus ring. Statuses speak the hard-hat code of a mining site (green conforme, red descarte, amber revisión, blue en curso, grey pendiente), each one an explicit mark with a square swatch and an uppercase narrow label.
+The interface dresses like the worker's own personal protective equipment. A graphite shell bar carries the logo on a white plate; below it the page floor is a cold light grey and every working surface is white with a 1px hairline. Against that quiet field, one thing glows: a fluorescent orange band crossed by a double white retroreflective stripe, worn only by whatever is active right now: the current phase, the one action that advances, the focus ring. Statuses speak the hard-hat code of a mining site (green conforme, red descarte, amber revisión, blue en curso, grey pendiente), each one an explicit mark with a square swatch and an uppercase narrow label.
 
 Density follows the reader. The applicant portal is generous and touch-first (48px fields and buttons, 56px option cards, a 352px rail explaining why each document is asked for). The RR.HH. panel is a high-density module board: a five-cell metrics strip split by hairlines, a sticky-header matrix with 48px rows grouped action-first, and a right-hand drawer that opens the file without losing the matrix. Motion is brief and literal: a sheen crosses the reflective stripe when a phase activates, like headlights sweeping a vest, and a state cell flips like a split-flap board when it changes. Both stand down under reduced motion.
 
@@ -236,7 +237,8 @@ A cold, graphite-and-grey industrial field where colour is spent only on activit
 - **Hi-Vis Wash** (hivis-tint): background of a selected quiz option only.
 
 ### Secondary
-- **Retroreflective Silver** (reflect): the double stripe on the active phase, the 5px base strip on primary buttons, the drawer head's bottom rule, the login panel's vertical stripe, pending rail dots, labels on graphite.
+- **Reflective Tape White** (stripe, #ffffff): the double stripe on the active phase, the tape line inside the primary button's bottom edge, the login panel's vertical stripe and the email band. White, not silver: on orange it reads as tape catching light.
+- **Silver** (reflect): the drawer head's bottom rule, pending rail dots, camera reticle corners, labels on graphite.
 - **Silver Highlight** (reflect-hi): body text on the graphite shell, completed phase labels.
 - **Dim Silver** (reflect-dim): pending phase numbers and labels on graphite.
 
@@ -305,7 +307,7 @@ Flat by construction. Depth comes from tonal layering (graphite shell over cold 
 - **Overlay** (`0 8px 24px rgba(28,35,45,0.12), 0 2px 6px rgba(28,35,45,0.06)`): drawer, toasts, notification dropdown, skip link. Only for things that float above the page.
 - **Decision footer** (`0 -6px 16px rgba(28,35,45,0.06)`): the drawer's sticky decision bar, separating it from scrolling content.
 
-The primary button's silver base strip is an inset shadow (`inset 0 -5px 0` reflect; 3px when pressed, 4px on small buttons). It reads as reflective tape, not elevation.
+The primary button carries a 3px white tape line just above its bottom edge, drawn with two inset shadows (`inset 0 -5px 0` hivis over `inset 0 -8px 0` stripe; shifted up 2px when pressed, matched to hivis-deep on hover). It reads as reflective tape, not elevation.
 
 ### Named Rules
 **The Hairline Before Shadow Rule.** Separate with a 1px line or a tonal step first. Shadow is reserved for overlays; a resting module never gets more than the resting shadow.
@@ -318,14 +320,14 @@ Gently squared industrial forms. Controls, buttons, fields, callouts and option 
 
 ### Phase Band (signature)
 The vest itself. Three equal segments on raised graphite, edge to edge, 76px tall.
-- **Active:** fluorescent orange with the double silver stripe at 9 to 17% and 83 to 91% of the height (hard stops, no blending), graphite text, and a one-time 700ms white sheen sweeping across 150ms after activation. Its neighbour's divider disappears so the band reads as one strip.
+- **Active:** fluorescent orange with the double white stripe at 9 to 17% and 83 to 91% of the height (hard stops, no blending), graphite text, and a one-time 700ms white sheen sweeping across 150ms after activation. Its neighbour's divider disappears so the band reads as one strip.
 - **Pending:** dim silver Narrow numeral (2.125rem) and caps label on graphite.
 - **Completed:** the numeral is replaced by a green-on-dark check; label in silver highlight at weight 500.
 - **Mobile:** gutters tighten to 24px, numerals drop to 1.75rem, labels wrap.
 
 ### Buttons
 - **Shape:** 6px corners, 48px tall (40px small, 36px inside matrix rows, 56px large), weight 700.
-- **Primary:** hivis fill, graphite text, a 5px silver base strip; hover deepens to hivis-deep, press thins the strip to 3px. One per view.
+- **Primary:** hivis fill, graphite text, a white tape line inside its bottom edge; hover deepens to hivis-deep. One per view.
 - **Secondary:** white with a strong hairline; hover moves to sunken surface. **Danger:** white with red line and text, red tint on hover. **Success:** green tint, line and text, used for confirmed results (and copied links). **Camera:** graphite fill, white text. **On dark:** transparent with shell hairline, for the shell bar.
 - **Disabled (unavailable):** recessed fill, no strip, label struck through (1.5px muted line).
 - **Disabled (loading):** same fill, never struck; a 16px spinner leads the label and the cursor shows progress.
@@ -339,7 +341,7 @@ The vest itself. Three equal segments on raised graphite, edge to edge, 76px tal
 ### Matrix (RR.HH.)
 - **Order:** action first. Group rows (sunken, Narrow 700 caps with a muted count) split "Requiere acción" from the rest.
 - **Rows:** 48px, 0.875rem, hairline dividers, hover to sunken surface; sticky Narrow caps headers on sunken.
-- **Estado cell:** the whole cell takes the state tint, pill sits transparent inside. On change, the cell flips open top-down (320ms clip) and a silver sheen crosses it (340ms), like a split-flap board.
+- **Estado cell:** the whole cell takes the state tint, pill sits transparent inside. On change, the cell flips open top-down (320ms clip) and a white sheen crosses it (340ms), like a split-flap board.
 - **Row actions:** secondary small buttons at 36px.
 
 ### Metrics Strip
@@ -365,13 +367,14 @@ Graphite bar, 64px, logo on a white 4px plate (32px tall), context line in silve
 920px right panel over a 48% graphite scrim, sliding in 220ms. Sticky head with a silver bottom rule shows the name and a hard-hat swatch plus caps state label in its state colour. Sections split by hairlines; the decision bar sticks to the bottom.
 
 ### Login
-Split screen: graphite brand panel with logo plate, display title and a flat vertical reflective stripe (two silver bands, graphite between) near its right edge; white form side with a single primary button.
+Split screen: graphite brand panel with logo plate, display title and a flat vertical reflective stripe (two white bands, graphite between) near its right edge; white form side with a single primary button.
 
 ## Do's and Don'ts
 
 ### Do:
+- **Do** use the same system in transactional email (src/mailer.js): graphite header with logo plate, orange phase band with white stripes, white body, hard-hat status pill, orange button with white tape line, graphite footer; table layout, inline styles, Arial as the font fallback.
 - **Do** keep hivis to the current phase, the one primary action, the focus ring and the user's current selection; text on it is graphite.
-- **Do** draw the reflective stripe as hard-stop silver bands (9 to 17% and 83 to 91% on horizontal bands; flat vertical bands on the login panel), never as a soft gradient.
+- **Do** draw the reflective stripe as hard-stop white bands (9 to 17% and 83 to 91% on horizontal bands; flat vertical bands on the login panel), never as a soft gradient.
 - **Do** show every status as a labelled hard-hat mark: square swatch, Narrow caps label, text colour on its own tint.
 - **Do** strike through the label of an unavailable button, and keep loading buttons (spinner) and the drawer's current-state button (positive "Estado actual" tag) unstruck.
 - **Do** set every comparable number in tabular numerals, and labels in Archivo Narrow caps.

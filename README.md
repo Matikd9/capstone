@@ -205,3 +205,33 @@ El repositorio incluye un [Dockerfile](Dockerfile) optimizado para despliegues e
    - `ADMIN_DEFAULT_PASSWORD`: Clave para el primer inicio de sesión admin
    - `SMTP_USER` / `SMTP_PASS`: Credenciales SMTP para el envío de correos (nunca en el código)
    - `PORT`: `8080` (predeterminado para Cloud Run)
+
+---
+
+## 8. Pruebas e Integración Continua (GitHub Actions)
+
+### Ejecutar las pruebas en local
+Requiere el stack de Docker levantado (`docker compose up -d`). Las pruebas crean y borran sus propias bases `web_app_test_*`; nunca tocan `web_app` ni producción, y simulan Gemini y el correo.
+
+```bash
+docker exec -w /app capstone-app npm test     # o "npm test" desde Windows
+docker exec -w /app capstone-app npm run lint # formato (Prettier)
+```
+
+### Qué hace el CI
+El workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) se ejecuta en cada `push` y en cada Pull Request. Dentro de un contenedor `node:20-bookworm-slim` (la misma imagen del Dockerfile) y con un MySQL 8.0 temporal:
+
+1. `npm ci`
+2. Verificación de sintaxis (`node --check`)
+3. Formato (`npm run lint`)
+4. Pruebas unitarias y de integración (`npm test`)
+
+No usa secretos ni despliega nada. Si cualquier paso falla, la ejecución queda en rojo.
+
+### Dónde ver los resultados
+- Pestaña **Actions** del repositorio: una ejecución por cada push; al abrirla se ve el paso que falló y su registro.
+- En un Pull Request: sección **Checks**, con el estado "CI / Sintaxis, formato y pruebas".
+- Junto a cada commit aparece un visto verde o una cruz roja.
+
+### Impedir que se fusione un PR con pruebas fallidas
+En GitHub: **Settings → Branches → Add branch ruleset** (o *Add rule*) para `main` → activar **Require status checks to pass** y elegir **Sintaxis, formato y pruebas**. Esa opción aparece después de la primera ejecución del workflow.

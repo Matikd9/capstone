@@ -1,0 +1,56 @@
+name: CI
+
+# Verifica cada push y cada Pull Request: sintaxis, formato y pruebas (unitarias e integración).
+# No despliega nada ni usa secretos: todo corre contra una BD MySQL temporal del propio job.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Sintaxis, formato y pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Misma imagen que el Dockerfile y docker-compose.yml.
+    container: node:20-bookworm-slim
+
+    services:
+      # Se llama "db" como en docker-compose.yml; las pruebas solo aceptan hosts locales (db, localhost, 127.0.0.1).
+      db:
+        image: mysql:8.0
+        env:
+          # Contraseña pública de la BD local de docker-compose.yml; la BD se destruye al terminar el job.
+          MYSQL_ROOT_PASSWORD: rootpassword
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -prootpassword"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
+    env:
+      DB_HOST: db
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar sintaxis
+        run: |
+          for f in src/*.js src/security/*.js public/*.js; do
+            node --check "$f"
+          done
+
+      - name: Verificar formato (Prettier)
+        run: npm run lint
+
+      - name: Pruebas unitarias y de integración
+        run: npm test

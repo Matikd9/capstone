@@ -2,9 +2,30 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-@AGENTS.md
+## Stack
 
-Las directivas de `AGENTS.md` (protocolo supervisado, restricciones negativas, orquestación por subagentes) son obligatorias y tienen prioridad. Este archivo solo agrega contexto de arquitectura.
+- Node.js 20, CommonJS (`require` / `module.exports`) en `src/`.
+- Frontend en `public/*.js`: JavaScript vanilla cargado como script clásico en el navegador; no usar `import`/`export` ni bundlers.
+- BD: MySQL 8.0 (local) y TiDB Cloud Serverless (producción, TLSv1.2). Driver `mysql2/promise`, sin ORM.
+
+## Convenciones
+
+- Compatibilidad TiDB: no usar `LOCK TABLES` ni asumir contigüidad de `AUTO_INCREMENT`; mantener `ssl: { rejectUnauthorized: true }` en producción.
+- No leer ni modificar `.env` / `.env.production`; las variables nuevas se documentan en `.env.example`.
+- Preferir `crypto` y `fetch` nativos de Node antes de agregar dependencias.
+- Conservar los comentarios legales y normativos (Ley N° 19.628, estándares ECF de Codelco, dictámenes de la Dirección del Trabajo).
+- `src/server.js` es muy grande: leer por rangos de líneas y editar con cambios puntuales, sin reescribirlo.
+- Cambios estructurales en `src/server.js` o en el esquema de BD: presentar un plan breve y pedir confirmación antes de ejecutar.
+
+## Verificación
+
+Antes de dar una tarea por terminada (es lo mismo que ejecuta el CI en `.github/workflows/ci.yml`):
+
+```bash
+node -c src/server.js           # y cualquier otro módulo tocado
+npm run lint                    # Prettier
+npm test                        # node:test: tests/unit + tests/integration (requiere la BD local de Docker)
+```
 
 ## Comandos
 
@@ -15,7 +36,8 @@ docker compose down -v          # Destruye la BD local; initDB() la reconstruye 
 npm run dev                     # nodemon fuera de Docker (si falla host 'db', initDB cae a 127.0.0.1)
 npm run lint                    # prettier --check (src, public js/css)
 npm run format                  # prettier --write
-node -c src/server.js           # Verificación de sintaxis (no hay suite de tests)
+node -c src/server.js           # Verificación de sintaxis
+npm test                        # Pruebas unitarias y de integración (BD local web_app_test_*)
 ```
 
 - Portal postulante: `http://localhost:3000/` — Fase 2 vía magic link `/?token=...`

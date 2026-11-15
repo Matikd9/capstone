@@ -541,8 +541,8 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="info-item">
             <span class="label">Calce de cargo (IA)</span>
-            <span class="value ${(candidate.role_fit_percentage ?? 80) >= 70 ? "value--ok" : "value--warn"}">
-              ${candidate.role_fit_percentage ? `${candidate.role_fit_percentage}% Afinidad` : "Conforme (80%)"}
+            <span class="value ${(candidate.role_fit_percentage ?? 0) >= 70 ? "value--ok" : "value--warn"}">
+              ${candidate.role_fit_percentage ? `${candidate.role_fit_percentage}% Afinidad` : "Sin evaluar"}
             </span>
           </div>
           <div class="info-item">
@@ -629,7 +629,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
 
         <dl class="check-list">
-          <div class="check-item"><dt>1. Credencial técnica (Fase 1)</dt><dd>${escapeHtml(candidate.ocr_credencial_status || candidate.required_credential || "Verificada")}</dd></div>
+          <div class="check-item"><dt>1. Credencial técnica (Fase 1)</dt><dd>${escapeHtml(candidate.ocr_credencial_status || "No verificada")}</dd></div>
           <div class="check-item"><dt>2. Cruce nombre / RUT (OCR)</dt><dd>${escapeHtml(candidate.ocr_detected_name || candidate.full_name)} (${escapeHtml(candidate.ocr_detected_rut || candidate.rut_id)})</dd></div>
           <div class="check-item"><dt>3. Vigencia cédula (OCR)</dt><dd>${escapeHtml(candidate.ocr_carnet_vigencia || "Pendiente Fase 2")}</dd></div>
           <div class="check-item"><dt>4. Cert. antecedentes (OCR)</dt><dd>${escapeHtml(candidate.ocr_antecedentes_status || "Pendiente Fase 2")}</dd></div>

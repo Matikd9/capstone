@@ -20,18 +20,26 @@ const mailer = require("./mailer");
 const mammoth = require("mammoth");
 const auth = require("./auth");
 const fileSecurity = require("./security/fileSecurity");
+const crypto = require("crypto");
+const helmet = require("helmet");
+const { AppError, errorHandler, notFoundApi, redact } = require("./errors");
+const { schemas, validate } = require("./validation");
+const documentDecision = require("./documentDecision");
 
 // Evitar que errores asíncronos internos de workers OCR tumben el proceso Node.js
+let serverListening = false;
 process.on("uncaughtException", (err) => {
   console.error(
     "[Proceso - Excepción Capturada]:",
-    err && err.message ? err.message : err,
+    redact(err && err.message ? err.message : err),
   );
+  // Un error de arranque (configuración inválida) debe terminar el proceso con error, no quedar oculto.
+  if (!serverListening) process.exit(1);
 });
 process.on("unhandledRejection", (reason) => {
   console.error(
     "[Proceso - Promesa Rechazada]:",
-    reason && reason.message ? reason.message : reason,
+    redact(reason && reason.message ? reason.message : reason),
   );
 });
 
@@ -40,7 +48,8 @@ app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 
 // Configurar directorio de subidas privado (fuera del directorio estático público)
-const UPLOADS_DIR = path.join(__dirname, "../storage/uploads");
+const UPLOADS_DIR =
+  process.env.UPLOADS_DIR || path.join(__dirname, "../storage/uploads");
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
@@ -74,6 +83,58 @@ const loginRateLimiter = rateLimit({
     error:
       "Demasiados intentos fallidos de autenticación. Bloqueo temporal por 15 minutos.",
   },
+});
+
+// Cabeceras HTTP de seguridad. El único <script> inline (login.html) se autoriza por hash, calculado al arrancar.
+const inlineScriptHashes = [
+  ...fs
+    .readFileSync(path.join(__dirname, "admin_portal/login.html"), "utf8")
+    .matchAll(/<script>([\s\S]*?)<\/script>/g),
+].map(
+  (m) =>
+    `'sha256-${crypto.createHash("sha256").update(m[1]).digest("base64")}'`,
+);
+const isProductionEnv = process.env.NODE_ENV === "production";
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'", ...inlineScriptHashes],
+        // shortcut: admin.js usa 12 onclick inline y la exportación un onclick de impresión; migrarlos a addEventListener para quitar esto
+        "script-src-attr": ["'unsafe-inline'"],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com",
+        ],
+        "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
+        "img-src": ["'self'", "data:", "blob:"],
+        "media-src": ["'self'", "blob:"],
+        "connect-src": ["'self'"],
+        "frame-src": ["'self'"],
+        "frame-ancestors": ["'self'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "form-action": ["'self'"],
+        "upgrade-insecure-requests": isProductionEnv ? [] : null,
+      },
+    },
+    // HSTS solo en producción: en localhost (HTTP) fijaría HTTPS en el navegador.
+    strictTransportSecurity: isProductionEnv
+      ? { maxAge: 15552000, includeSubDomains: true }
+      : false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
+// La cámara es necesaria para la selfie del mini-test (Fase 1.5); el resto de APIs sensibles se deniega.
+app.use((req, res, next) => {
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(self), microphone=(), geolocation=(), payment=(), usb=()",
+  );
+  next();
 });
 
 // Aumentar límites para transferencia de documentos y fotos
@@ -125,12 +186,22 @@ app.get("/admin.html", (req, res) => {
 
 // Configuración DB MySQL / TiDB (Compatible con desarrollo local TCP, TiDB Cloud TLS y sockets Unix Cloud SQL)
 const isProduction = process.env.NODE_ENV === "production";
-const defaultHost = isProduction
-  ? "gateway01.sa-east-1.prod.aws.tidbcloud.com"
-  : "db";
+// En producción no hay credenciales por defecto: deben venir del entorno (Cloud Run / Secret Manager).
+if (isProduction) {
+  const missingDbVars = ["DB_HOST", "DB_USER", "DB_PASSWORD"].filter(
+    (name) => !process.env[name],
+  );
+  if (missingDbVars.length > 0) {
+    throw new Error(
+      `Faltan variables de entorno de base de datos en producción: ${missingDbVars.join(", ")}.`,
+    );
+  }
+}
+// Valores por defecto solo para la BD local de docker-compose.yml.
+const defaultHost = "db";
 const defaultPort = isProduction ? 4000 : 3306;
-const defaultUser = isProduction ? "REMOVED" : "root";
-const defaultPassword = isProduction ? "REMOVED" : "rootpassword";
+const defaultUser = "root";
+const defaultPassword = "rootpassword";
 
 const host = process.env.DB_HOST || defaultHost;
 const isCloudSqlSocket = host && host.startsWith("/cloudsql/");
@@ -654,10 +725,10 @@ function escapeHtml(str) {
 }
 
 // Función auxiliar para guardar imágenes Base64 / PDFs con validación de seguridad
-function saveBase64File(base64Data, prefix = "file", defaultExt = "jpg") {
+function saveBase64File(base64Data, prefix = "file") {
   if (!base64Data) return { url: null, absolutePath: null, error: null };
   try {
-    const matches = base64Data.match(/^data:([A-Za-z0-9-+\/\.]+);base64,(.+)$/);
+    const matches = base64Data.match(/^data:([A-Za-z0-9-+\/\.]+);base64,(.*)$/);
     const buffer = matches
       ? Buffer.from(matches[2], "base64")
       : Buffer.from(base64Data, "base64");
@@ -690,18 +761,17 @@ function saveBase64File(base64Data, prefix = "file", defaultExt = "jpg") {
       };
     }
 
-    let extension = defaultExt;
-    if (["pdf", "docx", "jpg", "png", "webp"].includes(realType)) {
-      extension = realType;
-    } else if (matches && matches[1]) {
-      const mime = matches[1].toLowerCase();
-      if (mime.includes("pdf")) extension = "pdf";
-      else if (mime.includes("wordprocessingml") || mime.includes("docx"))
-        extension = "docx";
-      else if (mime.includes("png")) extension = "png";
-      else if (mime.includes("webp")) extension = "webp";
-      else if (mime.includes("jpeg") || mime.includes("jpg")) extension = "jpg";
+    // Solo se aceptan formatos que el OCR y el visor pueden procesar, según el contenido real (no el MIME declarado).
+    // HEIC y .doc antiguo quedan fuera: ni Tesseract, ni mammoth, ni el visor del panel los leen.
+    if (!["pdf", "docx", "jpg", "png", "webp"].includes(realType)) {
+      return {
+        url: null,
+        absolutePath: null,
+        error:
+          "Formato no admitido. Suba un archivo PDF, JPG, PNG, WEBP o DOCX.",
+      };
     }
+    const extension = realType;
 
     // 2. Escáner heurístico de macros y scripts peligrosos
     const scan = fileSecurity.scanDocumentHeuristics(buffer, extension);
@@ -1349,15 +1419,32 @@ function pickBestPersonName(candidatesList, referenceNameOrEmail = null) {
   return bestName;
 }
 
+// Funciones de apoyo para documentDecision (definidas en este archivo).
+const decisionHelpers = {
+  isValidRut: (rut) => isValidChileanRutMod11(rut),
+  normalize: (text) => normalizeTextForMatch(text),
+};
+
+// Construye una fecha solo si existe en el calendario (rechaza 31/02 o 99/99 en vez de desbordar al mes siguiente).
+function buildCalendarDate(year, monthIndex, day) {
+  const d = new Date(year, monthIndex, day, 12, 0, 0);
+  return d.getFullYear() === year &&
+    d.getMonth() === monthIndex &&
+    d.getDate() === day
+    ? d
+    : null;
+}
+
 function parseChileanDate(rawDateStr) {
   if (!rawDateStr) return null;
   const str = String(rawDateStr).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    return new Date(str + "T12:00:00Z");
+    const [y, m, d] = str.split("-").map(Number);
+    return buildCalendarDate(y, m - 1, d);
   }
   if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(str)) {
     const parts = str.split(/[\/\-]/).map(Number);
-    return new Date(parts[2], parts[1] - 1, parts[0], 12, 0, 0);
+    return buildCalendarDate(parts[2], parts[1] - 1, parts[0]);
   }
   const meses = {
     enero: 0,
@@ -1382,7 +1469,7 @@ function parseChileanDate(rawDateStr) {
     const mName = match[2];
     const y = parseInt(match[3], 10);
     if (meses[mName] !== undefined) {
-      return new Date(y, meses[mName], d, 12, 0, 0);
+      return buildCalendarDate(y, meses[mName], d);
     }
   }
   const fallback = new Date(str);
@@ -2499,126 +2586,152 @@ async function runTesseractOnFiles(fileItems) {
 // REST ENDPOINTS
 // ============================================================================
 
+// ==========================================
+// VALIDACIÓN DE ENTRADAS (Zod): se ejecuta antes del handler de cada ruta y descarta campos inesperados
+// ==========================================
+app.get("/api/positions/:id/questions", validate({ params: schemas.idParam }));
+app.post("/api/ocr/phase1", validate({ body: schemas.ocrUpload }));
+app.post("/api/ocr/extract", validate({ body: schemas.ocrUpload }));
+app.post(
+  ["/api/candidates", "/api/candidates/phase1-submit"],
+  validate({ body: schemas.phase1Submit }),
+);
+app.post(
+  "/api/candidates/:id/phase2-acreditacion",
+  validate({ params: schemas.idParam, body: schemas.phase2Submit }),
+);
+app.post(
+  "/api/candidates/session",
+  validate({ body: schemas.candidateSession }),
+);
+app.post("/api/auth/admin-login", validate({ body: schemas.adminLogin }));
+const statusUpdateSchema = schemas.statusUpdate(VALID_STATES);
+// Las rutas /api/admin/* validan dentro de su definición, después de requireAdminAuth (401 antes que 400).
+
 // 0. SERVIDOR SEGURO DE DOCUMENTOS PRIVADOS (Con Autenticación y Control de Acceso)
-app.get(["/api/files/:filename", "/uploads/:filename"], async (req, res) => {
-  try {
-    const rawFilename = req.params.filename;
-    if (!rawFilename)
-      return res
-        .status(400)
-        .json({ error: "Nombre de archivo no especificado." });
+app.get(
+  ["/api/files/:filename", "/uploads/:filename"],
+  async (req, res, next) => {
+    try {
+      const rawFilename = req.params.filename;
+      if (!rawFilename)
+        return res
+          .status(400)
+          .json({ error: "Nombre de archivo no especificado." });
 
-    // Prevenir ataques de Directory Traversal
-    const filename = path.basename(rawFilename);
-    const filePath = path.join(UPLOADS_DIR, filename);
+      // Prevenir ataques de Directory Traversal
+      const filename = path.basename(rawFilename);
+      const filePath = path.join(UPLOADS_DIR, filename);
 
-    // 1. Obtener buffer del archivo (Caché local en disco o respaldo permanente en TiDB Cloud)
-    let fileBuffer = null;
-    let fileMime = null;
+      // 1. Obtener buffer del archivo (Caché local en disco o respaldo permanente en TiDB Cloud)
+      let fileBuffer = null;
+      let fileMime = null;
 
-    if (fs.existsSync(filePath)) {
-      fileBuffer = fs.readFileSync(filePath);
-    } else {
-      // Si el archivo no está en el disco efímero de Cloud Run (ej. tras reinicio), recuperarlo de TiDB Cloud
-      try {
-        if (pool) {
-          const [fRows] = await pool.query(
-            "SELECT mime_type, file_data FROM file_storage WHERE filename = ?",
-            [filename],
-          );
-          if (fRows && fRows.length > 0) {
-            fileBuffer = fRows[0].file_data;
-            fileMime = fRows[0].mime_type;
-            // Guardar en caché de disco local para próximas peticiones rápidas
-            try {
-              fs.writeFileSync(filePath, fileBuffer);
-            } catch (e) {}
-            console.log(
-              `[File Server] Archivo ${filename} restaurado desde TiDB Cloud a disco efímero.`,
+      if (fs.existsSync(filePath)) {
+        fileBuffer = fs.readFileSync(filePath);
+      } else {
+        // Si el archivo no está en el disco efímero de Cloud Run (ej. tras reinicio), recuperarlo de TiDB Cloud
+        try {
+          if (pool) {
+            const [fRows] = await pool.query(
+              "SELECT mime_type, file_data FROM file_storage WHERE filename = ?",
+              [filename],
             );
+            if (fRows && fRows.length > 0) {
+              fileBuffer = fRows[0].file_data;
+              fileMime = fRows[0].mime_type;
+              // Guardar en caché de disco local para próximas peticiones rápidas
+              try {
+                fs.writeFileSync(filePath, fileBuffer);
+              } catch (e) {}
+              console.log(
+                `[File Server] Archivo ${filename} restaurado desde TiDB Cloud a disco efímero.`,
+              );
+            }
           }
+        } catch (dbErr) {
+          console.warn(
+            `[File Server] Error consultando TiDB para ${filename}:`,
+            dbErr.message,
+          );
         }
-      } catch (dbErr) {
-        console.warn(
-          `[File Server] Error consultando TiDB para ${filename}:`,
-          dbErr.message,
-        );
       }
-    }
 
-    if (!fileBuffer) {
-      return res
-        .status(404)
-        .json({ error: "Documento no encontrado o expirado en el servidor." });
-    }
+      if (!fileBuffer) {
+        return res.status(404).json({
+          error: "Documento no encontrado o expirado en el servidor.",
+        });
+      }
 
-    // 2. Verificar si es administrador RR.HH. autenticado (cookie de sesión nexxo_admin)
-    const adminUser = await auth.getAdminFromRequest(req);
-    let isAuthorized = Boolean(adminUser);
+      // 2. Verificar si es administrador RR.HH. autenticado (cookie de sesión nexxo_admin)
+      const adminUser = await auth.getAdminFromRequest(req);
+      let isAuthorized = Boolean(adminUser);
 
-    // 3. Si no es admin, verificar si es el candidato que posee el documento
-    //    (cookie de sesión de postulante nexxo_cand)
-    const fileLikeSql =
-      "(cv_file LIKE ? OR credencial_file LIKE ? OR carnet_file LIKE ? OR carnet_back_file LIKE ? OR antecedentes_file LIKE ? OR initial_selfie LIKE ?)";
-    const fileLikeParams = Array(6).fill(`%${filename}`);
-    const sessionCid = !isAuthorized && auth.getCandidateIdFromRequest(req);
-    if (sessionCid) {
-      const [rows] = await pool.query(
-        `SELECT id FROM candidates WHERE id = ? AND ${fileLikeSql}`,
-        [sessionCid, ...fileLikeParams],
-      );
-      if (rows.length > 0) isAuthorized = true;
-    }
+      // 3. Si no es admin, verificar si es el candidato que posee el documento
+      //    (cookie de sesión de postulante nexxo_cand)
+      const fileLikeSql =
+        "(cv_file LIKE ? OR credencial_file LIKE ? OR carnet_file LIKE ? OR carnet_back_file LIKE ? OR antecedentes_file LIKE ? OR initial_selfie LIKE ?)";
+      const fileLikeParams = Array(6).fill(`%${filename}`);
+      const sessionCid = !isAuthorized && auth.getCandidateIdFromRequest(req);
+      if (sessionCid) {
+        const [rows] = await pool.query(
+          `SELECT id FROM candidates WHERE id = ? AND ${fileLikeSql}`,
+          [sessionCid, ...fileLikeParams],
+        );
+        if (rows.length > 0) isAuthorized = true;
+      }
 
-    // 4. Denegar acceso si no está autorizado (Protección Ley N° 19.628 / Datos Personales Sensibles)
-    if (!isAuthorized) {
-      return res.status(401).json({
-        error: "Acceso no autorizado al documento.",
-        message:
-          "Debe iniciar sesión en RR.HH. o contar con un token válido para acceder a este archivo.",
-      });
-    }
+      // 4. Denegar acceso si no está autorizado (Protección Ley N° 19.628 / Datos Personales Sensibles)
+      if (!isAuthorized) {
+        return res.status(401).json({
+          error: "Acceso no autorizado al documento.",
+          message:
+            "Debe iniciar sesión en RR.HH. o contar con un token válido para acceder a este archivo.",
+        });
+      }
 
-    // 5. Cabeceras de seguridad y despacho según tipo de archivo
-    res.setHeader("X-Content-Type-Options", "nosniff");
+      // 5. Cabeceras de seguridad y despacho según tipo de archivo
+      res.setHeader("X-Content-Type-Options", "nosniff");
 
-    const ext = path.extname(filename).toLowerCase();
-    const isDownload =
-      req.query.download === "1" || req.query.download === "true";
+      const ext = path.extname(filename).toLowerCase();
+      const isDownload =
+        req.query.download === "1" || req.query.download === "true";
 
-    const mimeTypes = {
-      ".pdf": "application/pdf",
-      ".jpg": "image/jpeg",
-      ".jpeg": "image/jpeg",
-      ".png": "image/png",
-      ".webp": "image/webp",
-      ".docx":
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ".doc": "application/msword",
-    };
+      const mimeTypes = {
+        ".pdf": "application/pdf",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".docx":
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".doc": "application/msword",
+      };
 
-    // Si se solicita descarga explícita mediante ?download=1
-    if (isDownload) {
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${encodeURIComponent(filename)}"`,
-      );
-      res.setHeader(
-        "Content-Type",
-        fileMime || mimeTypes[ext] || "application/octet-stream",
-      );
-      return res.send(fileBuffer);
-    }
+      // Si se solicita descarga explícita mediante ?download=1
+      if (isDownload) {
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${encodeURIComponent(filename)}"`,
+        );
+        res.setHeader(
+          "Content-Type",
+          fileMime || mimeTypes[ext] || "application/octet-stream",
+        );
+        return res.send(fileBuffer);
+      }
 
-    // Para archivos Word (.docx/.doc), los navegadores web no pueden renderizarlos dentro de un iframe.
-    // Los convertimos en HTML seguro mediante mammoth para visualizarlos de forma inmediata y aislada.
-    if (ext === ".docx" || ext === ".doc") {
-      try {
-        const conversion = await mammoth.convertToHtml({ buffer: fileBuffer });
-        const docHtml =
-          conversion.value ||
-          "<p><em>(Documento sin contenido de texto legible)</em></p>";
-        const renderedPage = `<!DOCTYPE html>
+      // Para archivos Word (.docx/.doc), los navegadores web no pueden renderizarlos dentro de un iframe.
+      // Los convertimos en HTML seguro mediante mammoth para visualizarlos de forma inmediata y aislada.
+      if (ext === ".docx" || ext === ".doc") {
+        try {
+          const conversion = await mammoth.convertToHtml({
+            buffer: fileBuffer,
+          });
+          const docHtml =
+            conversion.value ||
+            "<p><em>(Documento sin contenido de texto legible)</em></p>";
+          const renderedPage = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
@@ -2658,48 +2771,50 @@ app.get(["/api/files/:filename", "/uploads/:filename"], async (req, res) => {
   </div>
 </body>
 </html>`;
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.setHeader("Content-Disposition", "inline");
-        res.setHeader(
-          "Content-Security-Policy",
-          "default-src 'none'; style-src 'unsafe-inline';",
-        );
-        return res.send(renderedPage);
-      } catch (convErr) {
-        console.warn(
-          `[File Server] No se pudo convertir docx a HTML (${filename}):`,
-          convErr.message,
-        );
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.setHeader("Content-Disposition", "inline");
+          res.setHeader(
+            "Content-Security-Policy",
+            "default-src 'none'; style-src 'unsafe-inline';",
+          );
+          return res.send(renderedPage);
+        } catch (convErr) {
+          console.warn(
+            `[File Server] No se pudo convertir docx a HTML (${filename}):`,
+            convErr.message,
+          );
+        }
       }
-    }
 
-    // Cabeceras de seguridad para PDFs e Imágenes
-    res.setHeader("Content-Disposition", "inline");
-    if (fileMime || mimeTypes[ext]) {
-      res.setHeader("Content-Type", fileMime || mimeTypes[ext]);
-    }
+      // Cabeceras de seguridad para PDFs e Imágenes
+      res.setHeader("Content-Disposition", "inline");
+      if (fileMime || mimeTypes[ext]) {
+        res.setHeader("Content-Type", fileMime || mimeTypes[ext]);
+      }
 
-    return res.send(fileBuffer);
-  } catch (err) {
-    console.error("[Error File Server]:", err);
-    return res
-      .status(500)
-      .json({ error: "Error interno sirviendo el archivo." });
-  }
-});
+      return res.send(fileBuffer);
+    } catch (err) {
+      next(
+        new AppError(500, "Error interno sirviendo el archivo.", {
+          cause: err,
+        }),
+      );
+    }
+  },
+);
 
 // 1. Obtener lista de cargos con requisitos ECF Codelco
-app.get("/api/positions", async (req, res) => {
+app.get("/api/positions", async (req, res, next) => {
   try {
     const [rows] = await pool.query("SELECT * FROM positions ORDER BY id ASC");
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // 2. Obtener 5 preguntas para el Mini-Test Técnico (3 Técnicas Específicas + 2 SJT de Seguridad Crítica ECF)
-app.get("/api/positions/:id/questions", async (req, res) => {
+app.get("/api/positions/:id/questions", async (req, res, next) => {
   try {
     const { id } = req.params;
     // 3 Preguntas de Idoneidad Técnica Específica para el cargo
@@ -2716,12 +2831,12 @@ app.get("/api/positions/:id/questions", async (req, res) => {
     const questions = [...techQuestions, ...sjtQuestions];
     res.json({ questions });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // 3. FASE 1: Extracción OCR de Entrada (Credencial Técnica + CV) — Sin pedir Carnet ni Antecedentes
-app.post("/api/ocr/phase1", async (req, res) => {
+app.post("/api/ocr/phase1", async (req, res, next) => {
   const tempFiles = [];
   let lastGeminiError = null;
   try {
@@ -2802,13 +2917,14 @@ app.post("/api/ocr/phase1", async (req, res) => {
           experience_months: geminiData.experience_months ?? null,
           experience_years_in_role:
             geminiData.experience_years_in_role ?? geminiData.experience_years,
-          role_fit_percentage: geminiData.role_fit_percentage ?? 80,
+          role_fit_percentage: geminiData.role_fit_percentage ?? null,
           detected_skills: geminiData.detected_skills || [],
           role_fit_verdict: geminiData.role_fit_verdict || "",
           credencial_status:
-            geminiData.credencial_status || "Documento Técnico Verificado",
-          credencial_vigencia: geminiData.credencial_vigencia || "Vigente",
-          ocr_text: `[MOTOR: IA (${geminiData.used_model || "GEMINI"})]\nPerfil: ${geminiData.resumen_perfil || "Acreditación técnica conforme"}\nCargo: ${positionContext ? positionContext.name : "Operativo"} (Afinidad: ${geminiData.role_fit_percentage ?? 80}%)\nCredencial: ${geminiData.credencial_status} (${geminiData.credencial_vigencia})${geminiData.rut_source ? `\nFuente RUT: ${geminiData.rut_source}` : ""}`,
+            geminiData.credencial_status || "No verificado (requiere revisión)",
+          credencial_vigencia:
+            geminiData.credencial_vigencia || "No verificada",
+          ocr_text: `[MOTOR: IA (${geminiData.used_model || "GEMINI"})]\nPerfil: ${geminiData.resumen_perfil || "Sin resumen"}\nCargo: ${positionContext ? positionContext.name : "Operativo"} (Afinidad: ${geminiData.role_fit_percentage ?? "N/D"}%)\nCredencial: ${geminiData.credencial_status} (${geminiData.credencial_vigencia})${geminiData.rut_source ? `\nFuente RUT: ${geminiData.rut_source}` : ""}`,
         });
       } catch (geminiErr) {
         lastGeminiError = geminiErr.message;
@@ -2821,7 +2937,7 @@ app.post("/api/ocr/phase1", async (req, res) => {
 
     const items = [];
     if (credencial_file) {
-      const saved = saveBase64File(credencial_file, "tmp_cred", "jpg");
+      const saved = saveBase64File(credencial_file, "tmp_cred");
       if (saved.absolutePath) {
         tempFiles.push(saved.absolutePath);
         items.push({
@@ -2831,7 +2947,7 @@ app.post("/api/ocr/phase1", async (req, res) => {
       }
     }
     if (cv_file) {
-      const saved = saveBase64File(cv_file, "tmp_cv", "pdf");
+      const saved = saveBase64File(cv_file, "tmp_cv");
       if (saved.absolutePath) {
         tempFiles.push(saved.absolutePath);
         items.push({ type: "CV", filePath: saved.absolutePath });
@@ -2919,16 +3035,14 @@ app.post("/api/ocr/phase1", async (req, res) => {
       credencial_status:
         cred.detected_credencial_status ||
         cv.detected_credencial_status ||
-        "Documento Técnico Adjunto",
-      credencial_vigencia: cred.carnet_vigencia || "Vigente en documento",
+        "Documento técnico adjunto (no verificado)",
+      credencial_vigencia: cred.carnet_vigencia || "No verificada",
       ocr_text: combinedText,
       gemini_fallback_reason: lastGeminiError,
       gemini_is_available: isAvail,
-      gemini_key_len: (process.env.GEMINI_API_KEY || "").length,
     });
   } catch (err) {
-    console.error("[Error /api/ocr/phase1]:", err);
-    res.status(500).json({ error: "Error procesando OCR de Fase 1." });
+    next(new AppError(500, "Error procesando OCR de Fase 1.", { cause: err }));
   } finally {
     for (const f of tempFiles) {
       try {
@@ -2939,21 +3053,21 @@ app.post("/api/ocr/phase1", async (req, res) => {
 });
 
 // Compatibilidad con endpoint /api/ocr/extract
-app.post("/api/ocr/extract", async (req, res) => {
+app.post("/api/ocr/extract", async (req, res, next) => {
   req.body.credencial_file = req.body.credencial_file || req.body.carnet_file;
   req.body.cv_file = req.body.cv_file || req.body.antecedentes_file;
   const tempFiles = [];
   try {
     const items = [];
     if (req.body.credencial_file) {
-      const s = saveBase64File(req.body.credencial_file, "tmp_doc1", "jpg");
+      const s = saveBase64File(req.body.credencial_file, "tmp_doc1");
       if (s.absolutePath) {
         tempFiles.push(s.absolutePath);
         items.push({ type: "DOC_1", filePath: s.absolutePath });
       }
     }
     if (req.body.cv_file) {
-      const s = saveBase64File(req.body.cv_file, "tmp_doc2", "pdf");
+      const s = saveBase64File(req.body.cv_file, "tmp_doc2");
       if (s.absolutePath) {
         tempFiles.push(s.absolutePath);
         items.push({ type: "DOC_2", filePath: s.absolutePath });
@@ -2983,7 +3097,7 @@ app.post("/api/ocr/extract", async (req, res) => {
       ocr_text: combinedText,
     });
   } catch (err) {
-    res.status(500).json({ error: "Error procesando OCR." });
+    next(new AppError(500, "Error procesando OCR.", { cause: err }));
   } finally {
     for (const f of tempFiles) {
       try {
@@ -2996,7 +3110,7 @@ app.post("/api/ocr/extract", async (req, res) => {
 // 4. FASE 1 + FASE 1.5: Evaluar Filtro Curricular + Mini-Test Técnico (Nota >= 80%) + Selfie Transparente
 app.post(
   ["/api/candidates", "/api/candidates/phase1-submit"],
-  async (req, res) => {
+  async (req, res, next) => {
     try {
       const {
         full_name,
@@ -3044,23 +3158,41 @@ app.post(
       const minExpRequired = position.min_experience_years || 2;
 
       // Guardar archivos de Fase 1 y Selfie Transparente del Mini-Test
-      const cvResult = saveBase64File(cv_file, "cv", "pdf");
-      const credencialResult = saveBase64File(
-        credencial_file,
-        "credencial",
-        "jpg",
-      );
-      const selfieResult = saveBase64File(initial_selfie, "selfie_test", "jpg");
+      const cvResult = saveBase64File(cv_file, "cv");
+      const credencialResult = saveBase64File(credencial_file, "credencial");
+      const selfieResult = saveBase64File(initial_selfie, "selfie_test");
       const randomSelfieResult = saveBase64File(
         random_selfie,
         "selfie_test_random",
-        "jpg",
       );
+      // Un archivo enviado pero rechazado (vacío, ejecutable, macros) no puede continuar como si no existiera.
+      const rejectedPhase1File = [
+        cvResult,
+        credencialResult,
+        selfieResult,
+        randomSelfieResult,
+      ].find((r) => r.error);
+      if (rejectedPhase1File) {
+        throw new AppError(
+          400,
+          `Archivo rechazado: ${rejectedPhase1File.error}`,
+        );
+      }
 
       // Evaluar respuestas del Mini-Test Técnico (3 Técnicas + 2 SJT de Seguridad Crítica ECF)
-      const parsedAnswers = Array.isArray(answers)
+      const rawAnswers = Array.isArray(answers)
         ? answers
         : JSON.parse(answers || "[]");
+      // Cada pregunta cuenta una sola vez: evita inflar el puntaje repitiendo una respuesta correcta.
+      const seenQuestionIds = new Set();
+      const parsedAnswers = (
+        Array.isArray(rawAnswers) ? rawAnswers : []
+      ).filter((a) => {
+        const key = a && String(a.question_id);
+        if (!a || seenQuestionIds.has(key)) return false;
+        seenQuestionIds.add(key);
+        return true;
+      });
       let score = 0;
       let scoreTecnico = 0;
       let scoreSjt = 0;
@@ -3068,10 +3200,15 @@ app.post(
 
       for (const ans of parsedAnswers) {
         const [qRow] = await pool.query(
-          "SELECT correct_option, category, question_text FROM questions WHERE id = ?",
+          "SELECT correct_option, category, question_text, position_id FROM questions WHERE id = ?",
           [ans.question_id],
         );
-        if (qRow.length > 0) {
+        // Solo puntúan preguntas SJT o técnicas del cargo postulado.
+        if (
+          qRow.length > 0 &&
+          ((qRow[0].category || "TECNICA") === "SJT" ||
+            Number(qRow[0].position_id) === Number(position_id))
+        ) {
           const qCat = qRow[0].category || "TECNICA";
           if (qRow[0].correct_option === ans.selected_option) {
             score++;
@@ -3220,14 +3357,13 @@ app.post(
             : "No califica en esta convocatoria.",
       });
     } catch (err) {
-      console.error("[Error /api/candidates/phase1-submit]:", err);
-      res.status(500).json({ error: err.message });
+      next(err);
     }
   },
 );
 
 // 5. FASE 2 & FASE 3: Subida de Carnet + Antecedentes (Solo Preseleccionados) + Motor OCR de Validación Cruzada
-app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
+app.post("/api/candidates/:id/phase2-acreditacion", async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
@@ -3303,17 +3439,21 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
     }
 
     // Guardar archivos de Fase 2
-    const carnetFrontRes = saveBase64File(carnet_file, `carnet_${id}`, "jpg");
-    const carnetBackRes = saveBase64File(
-      carnet_back_file,
-      `carnet_rev_${id}`,
-      "jpg",
-    );
+    const carnetFrontRes = saveBase64File(carnet_file, `carnet_${id}`);
+    const carnetBackRes = saveBase64File(carnet_back_file, `carnet_rev_${id}`);
     const antecedentesRes = saveBase64File(
       antecedentes_file,
       `antecedentes_${id}`,
-      "pdf",
     );
+
+    const rejectedPhase2File = [
+      carnetFrontRes,
+      carnetBackRes,
+      antecedentesRes,
+    ].find((r) => r.error);
+    if (rejectedPhase2File) {
+      throw new AppError(400, `Archivo rechazado: ${rejectedPhase2File.error}`);
+    }
 
     // Estado transitorio DOCS_CARGADOS antes del análisis cruzado
     await pool.query(
@@ -3326,9 +3466,11 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
     let ocrCarnetRut = candidate.rut_id;
     let ocrBirthDate = null;
     let ocrDetectedAge = candidate.age || 30;
-    let ocrCarnetVigencia = "Vigente";
-    let ocrAntecedentesStatus = "Sin Anotaciones";
+    let ocrCarnetVigencia = null;
+    let ocrAntecedentesStatus = null;
     let crossCheckOk = false;
+    let evidence = null;
+    let engineLabel = "";
     let facialMatchOk = null;
     let facialConfidence = null;
     let discrepancies = [];
@@ -3377,103 +3519,12 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
 
         if (g2) {
           geminiProcessed = true;
-          ocrCarnetName = g2.carnet_name || candidate.full_name;
-          effectiveCandidateName = ocrCarnetName;
-          ocrCarnetRut = g2.carnet_rut || candidate.rut_id;
-          ocrCarnetVigencia =
-            g2.carnet_vigencia ||
-            (g2.carnet_vigente_bool ? "Vigente" : "Vencido");
-
-          if (typeof g2.facial_match_ok === "boolean") {
-            facialMatchOk = g2.facial_match_ok ? 1 : 0;
-          }
+          engineLabel = "GEMINI FLASH";
+          // Solo evidencia: los huecos quedan en null, nunca se rellenan con datos de Fase 1.
+          evidence = documentDecision.evidenceFromGemini(g2, parseChileanDate);
           if (typeof g2.facial_confidence_percent === "number") {
             facialConfidence = Math.round(g2.facial_confidence_percent);
           }
-
-          // Cálculo DETERMINISTA de vigencia de antecedentes en JavaScript (máx. 60 días de antigüedad)
-          let antecedentesVigente = true;
-          let diasAntiguedad = null;
-          if (g2.antecedentes_fecha_emision) {
-            const rawDate = String(g2.antecedentes_fecha_emision).trim();
-            const parsedDate = parseChileanDate(rawDate);
-            if (parsedDate && !isNaN(parsedDate.getTime())) {
-              const now = new Date();
-              diasAntiguedad = Math.floor(
-                (now - parsedDate) / (1000 * 60 * 60 * 24),
-              );
-              if (diasAntiguedad > 60) {
-                antecedentesVigente = false;
-                discrepancies.push(
-                  `Certificado de antecedentes vencido (emitido hace ${diasAntiguedad} días, límite normativo 60 días).`,
-                );
-              } else if (diasAntiguedad < -2) {
-                antecedentesVigente = false;
-                discrepancies.push(
-                  `Certificado de antecedentes presenta fecha futura inconsistente (${rawDate}).`,
-                );
-              }
-            }
-          }
-
-          const tieneAnotaciones = Boolean(
-            g2.tiene_anotaciones_penales ||
-            (g2.antecedentes_status &&
-              g2.antecedentes_status.includes("Con Anotaciones")),
-          );
-          if (tieneAnotaciones) {
-            ocrAntecedentesStatus = "Con Anotaciones Penales";
-            discrepancies.push(
-              "Certificado de Antecedentes registra anotaciones penales que requieren revisión de RR.HH.",
-            );
-          } else {
-            ocrAntecedentesStatus =
-              diasAntiguedad !== null && antecedentesVigente
-                ? `Limpio / Vigente (${diasAntiguedad} días)`
-                : "Limpio / Sin Anotaciones";
-          }
-
-          // Validación de identidad contra Fase 1
-          const cleanCandRut = (candidate.rut_id || "")
-            .replace(/[^0-9kK]/g, "")
-            .toUpperCase();
-          const cleanCarnetRut = (ocrCarnetRut || "")
-            .replace(/[^0-9kK]/g, "")
-            .toUpperCase();
-          const rutOk = !cleanCarnetRut || cleanCarnetRut === cleanCandRut;
-          if (!rutOk) {
-            discrepancies.push(
-              `Discordancia de RUT: Fase 1 (${candidate.rut_id}) vs. Cédula (${ocrCarnetRut}).`,
-            );
-          }
-
-          const carnetVigente =
-            g2.carnet_vigente_bool !== false &&
-            !String(ocrCarnetVigencia).toLowerCase().startsWith("vencid");
-
-          crossCheckOk =
-            rutOk && carnetVigente && antecedentesVigente && !tieneAnotaciones;
-
-          if (g2.facial_match_ok === false) {
-            crossCheckOk = false;
-            discrepancies.push(
-              `[ALERTA SUPLANTACIÓN FACIAL: ${g2.facial_match_details || "Discrepancia en rasgos biométricos"}]`,
-            );
-          }
-
-          if (crossCheckOk) {
-            discrepancies = [];
-          } else if (g2.discrepancy_notes && discrepancies.length === 0) {
-            // Filtrar menciones falsas de "fecha futura" si el cálculo matemático confirmó vigencia
-            if (
-              !g2.discrepancy_notes.includes("fecha de emisión futura") ||
-              !antecedentesVigente
-            ) {
-              discrepancies.push(g2.discrepancy_notes);
-            }
-          }
-
-          combinedText = `[MOTOR: GEMINI FLASH]\nCédula: ${ocrCarnetName} (${ocrCarnetRut}) - ${ocrCarnetVigencia}\nAntecedentes: ${ocrAntecedentesStatus}\nCruce Identidad: ${crossCheckOk ? "CONFORME" : "CON DISCORDANCIAS"}`;
         }
       } catch (geminiErr) {
         console.warn("[OCR/Gemini Fallback Phase 2]:", geminiErr.message);
@@ -3511,15 +3562,6 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
           ? effectiveCandidateName
           : candidate.email,
       );
-      if (!isValidPersonName(effectiveCandidateName) && ocrCarnetName) {
-        effectiveCandidateName = ocrCarnetName;
-      }
-
-      ocrCarnetRut =
-        cedFront.detected_rut ||
-        cedBack.detected_rut ||
-        ant.detected_rut ||
-        null;
       ocrBirthDate =
         cedFront.birth_date || cedBack.birth_date || ant.birth_date || null;
       ocrDetectedAge =
@@ -3527,86 +3569,48 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
         cedBack.detected_age ??
         ant.detected_age ??
         candidate.age;
-      ocrCarnetVigencia =
-        cedFront.carnet_vigencia ||
-        cedBack.carnet_vigencia ||
-        "Verificación Visual en Carnet";
-      ocrAntecedentesStatus =
-        ant.antecedentes_status ||
-        cedFront.antecedentes_status ||
-        cedBack.antecedentes_status ||
-        "Certificado Cargado (Validar Código)";
-
-      const cleanCandidateRut = (candidate.rut_id || "")
-        .replace(/[^0-9kK]/g, "")
-        .toUpperCase();
-      const cleanCarnetRut = (ocrCarnetRut || "")
-        .replace(/[^0-9kK]/g, "")
-        .toUpperCase();
-
-      let rutMatches = false;
-      if (cleanCarnetRut && cleanCarnetRut === cleanCandidateRut) {
-        rutMatches = true;
-      } else if (cleanCarnetRut && cleanCarnetRut !== cleanCandidateRut) {
-        discrepancies.push(
-          `Discordancia de RUT: Fase 1 (${candidate.rut_id}) vs. Cédula OCR (${ocrCarnetRut}).`,
-        );
-      } else {
-        discrepancies.push(
-          "OCR no logró leer el RUT nítidamente en la foto de la cédula (requiere validación visual).",
-        );
-      }
-
-      const normCandidateName = normalizeTextForMatch(effectiveCandidateName);
-      const normCarnetName = normalizeTextForMatch(ocrCarnetName);
-      let nameMatches = false;
-      if (normCarnetName) {
-        const candidateTokens = normCandidateName
-          .split(" ")
-          .filter((t) => t.length > 2);
-        const carnetTokens = normCarnetName
-          .split(" ")
-          .filter((t) => t.length > 2);
-        const matchedTokens = candidateTokens.filter((t) =>
-          normCarnetName.includes(t),
-        );
-        if (matchedTokens.length >= Math.min(2, candidateTokens.length)) {
-          nameMatches = true;
-          if (
-            carnetTokens.length > candidateTokens.length &&
-            candidateTokens.every((t) => normCarnetName.includes(t))
-          ) {
-            effectiveCandidateName = ocrCarnetName;
-          }
-        } else {
-          discrepancies.push(
-            `Discordancia de Nombre: Postulación ("${effectiveCandidateName}") vs. Cédula OCR ("${ocrCarnetName}").`,
-          );
-        }
-      }
-
-      if (ocrCarnetVigencia.startsWith("Vencido")) {
-        discrepancies.push(
-          `Cédula de Identidad figura vencida (${ocrCarnetVigencia}).`,
-        );
-      }
-      if (ocrAntecedentesStatus.includes("Con Anotaciones")) {
-        discrepancies.push(
-          "Certificado de Antecedentes registra anotaciones que requieren revisión de RR.HH.",
-        );
-      }
-
-      crossCheckOk =
-        rutMatches &&
-        !ocrCarnetVigencia.startsWith("Vencido") &&
-        !ocrAntecedentesStatus.includes("Con Anotaciones") &&
-        discrepancies.length === 0;
+      engineLabel = "TESSERACT/POPPLER LOCAL";
+      evidence = documentDecision.evidenceFromLocalOcr(
+        { cedFront, cedBack, ant },
+        parseChileanDate,
+      );
+      if (ocrCarnetName) evidence.carnetName = ocrCarnetName;
     }
-    let finalStatus = crossCheckOk ? "PRE_ACREDITADO" : "EN_REVISION_MANUAL";
-    if (facialMatchOk === 0) {
-      crossCheckOk = false;
-      finalStatus = "EN_REVISION_MANUAL";
+
+    // Decisión única (Gemini u OCR local): sin evidencia comprobada no hay pre-acreditación automática.
+    const decision = documentDecision.evaluatePhase2Evidence(
+      evidence,
+      { rut: candidate.rut_id, name: effectiveCandidateName },
+      decisionHelpers,
+    );
+    crossCheckOk = decision.crossCheckOk;
+    const finalStatus = decision.status;
+    discrepancies = decision.discrepancies;
+    ocrCarnetVigencia = decision.carnetVigenciaLabel;
+    ocrAntecedentesStatus = decision.antecedentesLabel;
+    ocrCarnetName = evidence.carnetName;
+    ocrCarnetRut = evidence.carnetRut;
+    facialMatchOk =
+      evidence.facialMatch === true
+        ? 1
+        : evidence.facialMatch === false
+          ? 0
+          : null;
+    // Si el nombre coincide y la cédula lo trae más completo, se adopta el de la cédula.
+    const nameCheck = decision.checks.find((k) => k.key === "nombre_cedula");
+    if (
+      nameCheck.estado === documentDecision.VALIDO &&
+      normalizeTextForMatch(ocrCarnetName).split(" ").length >
+        normalizeTextForMatch(effectiveCandidateName).split(" ").length
+    ) {
+      effectiveCandidateName = ocrCarnetName;
     }
+    const verdictText = `[MOTOR: ${engineLabel}]\nVeredicto documental: ${decision.verdict}\n${decision.checks
+      .map((k) => `- ${k.key}: ${k.estado}`)
+      .join("\n")}`;
+    combinedText = geminiProcessed
+      ? verdictText
+      : `${combinedText}\n${verdictText}`;
 
     const updatedOcrText = [candidate.ocr_text, combinedText]
       .filter(Boolean)
@@ -3672,8 +3676,7 @@ app.post("/api/candidates/:id/phase2-acreditacion", async (req, res) => {
       discrepancies,
     });
   } catch (err) {
-    console.error("[Error /api/candidates/:id/phase2-acreditacion]:", err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -3804,7 +3807,7 @@ app.get("/api/candidates/me", async (req, res) => {
 // AUTENTICACIÓN Y SEGURIDAD RR.HH. (ADMIN)
 // ==========================================
 
-app.post("/api/auth/admin-login", async (req, res) => {
+app.post("/api/auth/admin-login", async (req, res, next) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -3857,8 +3860,7 @@ app.post("/api/auth/admin-login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("[Error /api/auth/admin-login]:", err);
-    res.status(500).json({ error: "Error interno de autenticación." });
+    next(new AppError(500, "Error interno de autenticación.", { cause: err }));
   }
 });
 
@@ -3891,7 +3893,8 @@ app.get("/api/auth/verify", async (req, res) => {
 app.post(
   "/api/admin/candidates/:id/approve-faena",
   auth.requireAdminAuth,
-  async (req, res) => {
+  validate({ params: schemas.idParam }),
+  async (req, res, next) => {
     try {
       const { id } = req.params;
       const [candRows] = await pool.query(
@@ -3991,60 +3994,59 @@ app.post(
         mail_note: mailResult.note || null,
       });
     } catch (err) {
-      console.error("[Error /api/admin/candidates/:id/approve-faena]:", err);
-      res.status(500).json({ error: err.message });
+      next(err);
     }
   },
 );
 
 // 6. PANEL RR.HH. NEXXO: Obtener postulantes con filtro por Cargo y Estado de la Máquina de Estados
-app.get("/api/admin/candidates", auth.requireAdminAuth, async (req, res) => {
-  try {
-    const { status, position_id } = req.query;
-    let query = `
+app.get(
+  "/api/admin/candidates",
+  auth.requireAdminAuth,
+  validate({ query: schemas.candidatesQuery }),
+  async (req, res, next) => {
+    try {
+      const { status, position_id } = req.query;
+      let query = `
       SELECT c.*, p.name as position_name, p.required_credential, p.ecf_code
       FROM candidates c 
       JOIN positions p ON c.position_id = p.id 
     `;
-    const params = [];
-    const conditions = [];
+      const params = [];
+      const conditions = [];
 
-    if (status) {
-      conditions.push("c.status = ?");
-      params.push(status);
+      if (status) {
+        conditions.push("c.status = ?");
+        params.push(status);
+      }
+      if (position_id) {
+        conditions.push("c.position_id = ?");
+        params.push(position_id);
+      }
+
+      if (conditions.length > 0) {
+        query += " WHERE " + conditions.join(" AND ");
+      }
+
+      query += " ORDER BY c.created_at DESC";
+
+      const [candidates] = await pool.query(query, params);
+      res.json(candidates);
+    } catch (err) {
+      next(err);
     }
-    if (position_id) {
-      conditions.push("c.position_id = ?");
-      params.push(position_id);
-    }
-
-    if (conditions.length > 0) {
-      query += " WHERE " + conditions.join(" AND ");
-    }
-
-    query += " ORDER BY c.created_at DESC";
-
-    const [candidates] = await pool.query(query, params);
-    res.json(candidates);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  },
+);
 
 // 7. PANEL RR.HH. NEXXO: Cambiar estado en la Máquina de Estados
 app.patch(
   "/api/admin/candidates/:id/status",
   auth.requireAdminAuth,
-  async (req, res) => {
+  validate({ params: schemas.idParam, body: statusUpdateSchema }),
+  async (req, res, next) => {
     try {
       const { id } = req.params;
       const { status } = req.body;
-
-      if (!VALID_STATES.includes(status)) {
-        return res
-          .status(400)
-          .json({ error: "Estado no válido en la máquina de estados." });
-      }
 
       await pool.query("UPDATE candidates SET status = ? WHERE id = ?", [
         status,
@@ -4087,13 +4089,13 @@ app.patch(
         mail_simulated: mailSimulated,
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      next(err);
     }
   },
 );
 
 // 8. PANEL RR.HH. NEXXO: Estadísticas Operativas e Impacto en División El Teniente
-app.get("/api/admin/stats", auth.requireAdminAuth, async (req, res) => {
+app.get("/api/admin/stats", auth.requireAdminAuth, async (req, res, next) => {
   try {
     const [totalRows] = await pool.query(
       "SELECT COUNT(*) as count FROM candidates",
@@ -4124,14 +4126,17 @@ app.get("/api/admin/stats", auth.requireAdminAuth, async (req, res) => {
       savedTurnoverCostsCLP: savedTurnoverCosts,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // 8.5 PANEL RR.HH. NEXXO: Centro de Notificaciones de Fase 2
-app.get("/api/admin/notifications", auth.requireAdminAuth, async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
+app.get(
+  "/api/admin/notifications",
+  auth.requireAdminAuth,
+  async (req, res, next) => {
+    try {
+      const [rows] = await pool.query(`
       SELECT 
         c.id, 
         c.full_name, 
@@ -4148,26 +4153,28 @@ app.get("/api/admin/notifications", auth.requireAdminAuth, async (req, res) => {
       LIMIT 15
     `);
 
-    const pendingReview = rows.filter(
-      (r) => r.status === "EN_REVISION_MANUAL" || r.status === "DOCS_CARGADOS",
-    );
+      const pendingReview = rows.filter(
+        (r) =>
+          r.status === "EN_REVISION_MANUAL" || r.status === "DOCS_CARGADOS",
+      );
 
-    res.json({
-      success: true,
-      pendingCount: pendingReview.length,
-      notifications: rows,
-    });
-  } catch (err) {
-    console.error("[Error /api/admin/notifications]:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+      res.json({
+        success: true,
+        pendingCount: pendingReview.length,
+        notifications: rows,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // 9. FASE 4: Exportar "Carpeta de Acreditación Estandarizada WebControl" (Codelco División El Teniente)
 app.get(
   "/api/admin/candidates/:id/export-webcontrol",
   auth.requireAdminAuth,
-  async (req, res) => {
+  validate({ params: schemas.idParam }),
+  async (req, res, next) => {
     try {
       const { id } = req.params;
       const [rows] = await pool.query(
@@ -4312,9 +4319,7 @@ app.get(
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.send(htmlReport);
     } catch (err) {
-      res
-        .status(500)
-        .send("Error generando carpeta WebControl: " + err.message);
+      next(err);
     }
   },
 );
@@ -4387,7 +4392,7 @@ async function reprocessCandidateOcr(id) {
     cedBack.detected_rut ||
     ant.detected_rut ||
     cred.detected_rut ||
-    c.rut_id;
+    c.ocr_detected_rut;
   const ocrBirthDate =
     cedFront.birth_date ||
     cedBack.birth_date ||
@@ -4399,79 +4404,55 @@ async function reprocessCandidateOcr(id) {
     ant.detected_age ??
     c.ocr_detected_age ??
     c.age;
-  const ocrCarnetVigencia =
-    cedFront.carnet_vigencia ||
-    cedBack.carnet_vigencia ||
-    c.ocr_carnet_vigencia ||
-    "Vigente";
-  const ocrAntecedentesStatus =
-    ant.antecedentes_status ||
-    cedFront.antecedentes_status ||
-    cedBack.antecedentes_status ||
-    c.ocr_antecedentes_status ||
-    "Sin Antecedentes (Al día)";
-
-  const discrepancies = [];
-  const cleanCandidateRut = (c.rut_id || "")
-    .replace(/[^0-9kK]/g, "")
-    .toUpperCase();
-  const cleanCarnetRut = (ocrCarnetRut || "")
-    .replace(/[^0-9kK]/g, "")
-    .toUpperCase();
-
-  const rutMatches = Boolean(
-    cleanCarnetRut && cleanCarnetRut === cleanCandidateRut,
-  );
-  if (!rutMatches && cleanCarnetRut) {
-    discrepancies.push(
-      `Discordancia de RUT: Fase 1 (${c.rut_id}) vs. Cédula OCR (${ocrCarnetRut}).`,
-    );
-  }
-
-  let nameMatches = true;
-  if (phase2Name && phase1Name) {
-    const normCand = normalizeTextForMatch(phase1Name);
-    const normCarnet = normalizeTextForMatch(phase2Name);
-    const tokens = normCand.split(" ").filter((t) => t.length > 2);
-    const carnetTokens = normCarnet.split(" ").filter((t) => t.length > 2);
-    const matched = tokens.filter((t) => normCarnet.includes(t));
-    if (matched.length >= Math.min(2, tokens.length)) {
-      if (
-        carnetTokens.length > tokens.length &&
-        tokens.every((t) => normCarnet.includes(t))
-      ) {
-        phase1Name = phase2Name;
-      }
-    } else {
-      nameMatches = false;
-      discrepancies.push(
-        `Discordancia de Nombre: Postulación ("${phase1Name}") vs. Cédula OCR ("${phase2Name}").`,
-      );
-    }
-  }
-
-  if (ocrCarnetVigencia.startsWith("Vencido")) {
-    discrepancies.push(
-      `Cédula de Identidad figura vencida (${ocrCarnetVigencia}).`,
-    );
-  }
-  if (ocrAntecedentesStatus.includes("Con Anotaciones")) {
-    discrepancies.push(
-      "Certificado de Antecedentes registra anotaciones que requieren revisión de RR.HH.",
-    );
-  }
-
   const hasPhase2Docs = Boolean(carnetFrontPath || antPath);
-  const crossCheckOk =
-    hasPhase2Docs && rutMatches && nameMatches && discrepancies.length === 0;
-  let newStatus = c.status;
+  // El reproceso usa OCR local (sin cotejo facial ni fecha de emisión): nunca aprueba.
+  // Solo deriva a revisión manual si encuentra una discordancia comprobada, y no toca la Fase 1.
+  const evidence = documentDecision.evidenceFromLocalOcr(
+    { cedFront, cedBack, ant },
+    parseChileanDate,
+  );
+  if (phase2Name) evidence.carnetName = phase2Name;
+  evidence.facialMatch =
+    c.facial_match_ok === 1 ? true : c.facial_match_ok === 0 ? false : null;
+  const decision = documentDecision.evaluatePhase2Evidence(
+    evidence,
+    { rut: c.rut_id, name: phase1Name },
+    decisionHelpers,
+  );
+  const decisionByKey = Object.fromEntries(
+    decision.checks.map((k) => [k.key, k]),
+  );
   if (
     hasPhase2Docs &&
-    (c.status === "EN_REVISION_MANUAL" ||
-      c.status === "DOCS_CARGADOS" ||
-      c.status === "PRE_ACREDITADO")
+    decisionByKey.nombre_cedula.estado === documentDecision.VALIDO &&
+    normalizeTextForMatch(phase2Name).split(" ").length >
+      normalizeTextForMatch(phase1Name).split(" ").length
   ) {
-    newStatus = crossCheckOk ? "PRE_ACREDITADO" : "EN_REVISION_MANUAL";
+    phase1Name = phase2Name;
+  }
+
+  let newStatus = c.status;
+  let crossCheckOk = Boolean(c.ocr_cross_check_ok);
+  let ocrCarnetVigencia = c.ocr_carnet_vigencia;
+  let ocrAntecedentesStatus = c.ocr_antecedentes_status;
+  let discrepancyNotes = c.discrepancy_notes;
+  const discrepancies = hasPhase2Docs ? decision.discrepancies : [];
+  if (hasPhase2Docs) {
+    if (decisionByKey.vigencia_cedula.estado !== documentDecision.PENDIENTE) {
+      ocrCarnetVigencia = decision.carnetVigenciaLabel;
+    }
+    if (decisionByKey.anotaciones.estado === documentDecision.INVALIDO) {
+      ocrAntecedentesStatus = decision.antecedentesLabel;
+    }
+    if (
+      c.status === "DOCS_CARGADOS" ||
+      (decision.hasInvalid &&
+        ["PRE_ACREDITADO", "EN_REVISION_MANUAL"].includes(c.status))
+    ) {
+      newStatus = "EN_REVISION_MANUAL";
+      crossCheckOk = false;
+      discrepancyNotes = decision.discrepancies.join(" | ");
+    }
   }
 
   // Limpiar nota de edición manual si se debió a un falso positivo previo (ej. "Adolfo Ibañez")
@@ -4528,16 +4509,14 @@ async function reprocessCandidateOcr(id) {
       ocrBirthDate,
       ocrDetectedAge,
       crossCheckOk ? 1 : 0,
-      phase2Name || phase1Name,
+      phase2Name || c.ocr_detected_name,
       ocrCarnetRut,
       ocrCarnetVigencia,
       ocrAntecedentesStatus,
       crossCheckOk ? 1 : 0,
       cleanedManuallyEdited,
       cleanedEditedFields,
-      discrepancies.length > 0
-        ? discrepancies.join(" | ")
-        : "Consistencia 100% verificada entre Fase 1 y Fase 2.",
+      discrepancyNotes,
       id,
     ],
   );
@@ -4545,7 +4524,7 @@ async function reprocessCandidateOcr(id) {
   return {
     id,
     full_name: phase1Name,
-    ocrCarnetName: phase2Name || phase1Name,
+    ocrCarnetName: phase2Name || null,
     city: updatedCity,
     experience_years: updatedExpYears,
     status: newStatus,
@@ -4557,7 +4536,8 @@ async function reprocessCandidateOcr(id) {
 app.post(
   "/api/admin/candidates/:id/reprocess-ocr",
   auth.requireAdminAuth,
-  async (req, res) => {
+  validate({ params: schemas.idParam }),
+  async (req, res, next) => {
     try {
       const result = await reprocessCandidateOcr(req.params.id);
       if (!result)
@@ -4566,14 +4546,19 @@ app.post(
           .json({ error: "Candidato o archivos no encontrados." });
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      next(err);
     }
   },
 );
 
 // Iniciar Servidor con manejo dinámico de puerto si el 3000 está ocupado
+// Rutas /api inexistentes y manejador central de errores (siempre al final de la cadena)
+app.use("/api/", notFoundApi);
+app.use(errorHandler);
+
 function startServer(portToUse) {
   const server = app.listen(portToUse, async () => {
+    serverListening = true;
     console.log(
       `[Servidor] Portal de Convocatoria y Pre-Filtro Normativo Nexxo S.A. listo en http://localhost:${portToUse}`,
     );
@@ -4624,4 +4609,31 @@ function startServer(portToUse) {
   });
 }
 
-startServer(parseInt(PORT, 10));
+// Solo arranca al ejecutarse directamente (node src/server.js); al importarse (pruebas) no abre puerto ni BD.
+if (require.main === module) {
+  startServer(parseInt(PORT, 10));
+}
+
+module.exports = {
+  app,
+  initDB,
+  getPool: () => pool,
+  closeDB: async () => {
+    if (pool) await pool.end();
+  },
+  reprocessCandidateOcr,
+  VALID_STATES,
+  saveBase64File,
+  escapeHtml,
+  formatTitleCase,
+  formatRut,
+  normalizeTextForMatch,
+  extractDatesFromText,
+  isValidPersonName,
+  pickBestPersonName,
+  parseChileanDate,
+  isValidChileanRutMod11,
+  splitCvIntoSections,
+  calculateExperienceFromSections,
+  parseExtractedText,
+};

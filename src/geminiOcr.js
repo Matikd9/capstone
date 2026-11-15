@@ -437,21 +437,23 @@ Datos de referencia registrados en Fase 1:
 - Nombre Registrado: "${phase1Name || "NO REGISTRADO"}"
 
 Analiza las imágenes adjuntas: Cédula de Identidad chilena (Frente y Reverso), Certificado de Antecedentes para Fines Especiales (Registro Civil) y las fotografías de verificación biométrica facial.
-Devuelve un JSON con el siguiente esquema estricto:
+Devuelve un JSON con el siguiente esquema estricto.
+REGLA DE INCERTIDUMBRE: si un documento está en blanco, es ilegible, no corresponde al tipo esperado o un dato no se distingue con claridad, devuelve null en ese campo. Nunca supongas, completes ni copies datos de Fase 1.
 
 {
   "carnet_rut": string o null (RUT detectado en la cédula en formato XX.XXX.XXX-X),
   "carnet_name": string o null (Nombre completo del titular según la cédula),
   "carnet_vigencia": string ("Vigente (Vence DD/MM/AAAA)" o "Vencido (Venció DD/MM/AAAA)"),
-  "carnet_vigente_bool": boolean (true si la cédula está vigente a la fecha de ${todayChilean}),
+  "carnet_fecha_vencimiento": string o null (fecha de vencimiento impresa en la cédula, formato YYYY-MM-DD),
+  "carnet_vigente_bool": boolean o null (null si no se puede leer la fecha de vencimiento),
   "antecedentes_rut": string o null (RUT en el certificado de antecedentes),
   "antecedentes_name": string o null (Nombre en el certificado de antecedentes),
   "antecedentes_fecha_emision": string o null (Fecha de emisión exacta del certificado en formato YYYY-MM-DD),
-  "tiene_anotaciones_penales": boolean (false si el certificado dice "NO REGISTRA ANOTACIONES" o "SIN ANTECEDENTES"),
+  "tiene_anotaciones_penales": boolean o null (false solo si el certificado dice expresamente "NO REGISTRA ANOTACIONES" o "SIN ANTECEDENTES"; null si no se puede leer),
   "antecedentes_status": string ("Limpio / Sin Anotaciones" o "Con Anotaciones Penales"),
   "rut_coincide": boolean (true si el RUT del carnet y antecedentes coincide con el de Fase 1),
   "nombre_coincide": boolean (true si el nombre del carnet coincide con el de Fase 1),
-  "facial_match_ok": boolean (true si las 3 fotografías corresponden indubitadamente a la misma persona),
+  "facial_match_ok": boolean o null (true si las 3 fotografías corresponden indubitadamente a la misma persona; null si falta una foto o no se distingue un rostro),
   "facial_confidence_percent": number (de 0 a 100),
   "facial_match_details": string (detalle del dictamen facial),
   "cross_check_ok": boolean (true si RUT y Nombre coinciden, no hay antecedentes penales y facial_match_ok es true),

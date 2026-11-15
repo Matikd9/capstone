@@ -321,11 +321,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function validateAndProcess(file) {
       if (!file) return;
 
-      const validExtensions = /\.(pdf|jpe?g|png|webp|bmp|docx?)$/i;
+      const validExtensions = /\.(pdf|jpe?g|png|webp|bmp|docx)$/i;
       const isWordMime =
         file.type ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        file.type === "application/msword";
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
       const isMimeValid =
         file.type === "application/pdf" ||
         file.type.startsWith("image/") ||
@@ -601,7 +600,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (telemetryExp)
           telemetryExp.textContent = `${data.experience_years || 0} años`;
         if (telemetryCred)
-          telemetryCred.textContent = data.credencial_status || "VERIFICADA";
+          telemetryCred.textContent = data.credencial_status || "SIN VERIFICAR";
 
         const hasDiscrepancy = Boolean(
           data.rut_discrepancia || data.name_discrepancia,

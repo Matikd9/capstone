@@ -1,0 +1,768 @@
+{
+  "parseExtractedText": {
+    "cv_rigger": {
+      "detected_name": "Juan Pablo Pérez Soto",
+      "detected_rut": "12.345.678-5",
+      "detected_email": "juan.perez@example.invalid",
+      "detected_phone": "+56 9 8765 4321",
+      "detected_city": "Rancagua",
+      "detected_experience_years": 8,
+      "detected_experience_months": 100,
+      "detected_credencial_status": "Credencial Rigger Detectada",
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "cv_soldador": {
+      "detected_name": "María José González Rojas",
+      "detected_rut": null,
+      "detected_email": "maria.gonzalez@example.invalid",
+      "detected_phone": "+56 9 7654 3210",
+      "detected_city": "Antofagasta",
+      "detected_experience_years": 12,
+      "detected_experience_months": 144,
+      "detected_credencial_status": "Calificación Soldador (WPQ) Detectada",
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "cv_operador": {
+      "detected_name": "Carlos Andrés Fuentes Vera",
+      "detected_rut": "15.432.198-K",
+      "detected_email": null,
+      "detected_phone": "+56 9 5555 4444",
+      "detected_city": "Calama",
+      "detected_experience_years": 5,
+      "detected_experience_months": 60,
+      "detected_credencial_status": "Licencia Clase D / Conductor Detectada",
+      "birth_date": "15/03/1985",
+      "detected_age": 41,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "cv_dos_columnas": {
+      "detected_name": null,
+      "detected_rut": null,
+      "detected_email": "ana.torres@example.invalid",
+      "detected_phone": "+56 9 4444 3333",
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "cv_con_instituciones": {
+      "detected_name": "Roberto Ignacio Salinas Paredes",
+      "detected_rut": null,
+      "detected_email": "roberto.salinas@example.invalid",
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "cv_sin_secciones": {
+      "detected_name": "Luis Alberto Ramírez Campos",
+      "detected_rut": null,
+      "detected_email": "luis.ramirez@example.invalid",
+      "detected_phone": null,
+      "detected_city": "Talca",
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "cv_meses_abreviados": {
+      "detected_name": "Felipe Andrés Rojas Lagos",
+      "detected_rut": null,
+      "detected_email": "felipe.rojas@example.invalid",
+      "detected_phone": null,
+      "detected_city": "Puerto Montt",
+      "detected_experience_years": 9,
+      "detected_experience_months": 111,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "cedula_frente_vigente": {
+      "detected_name": "Maria Jose Gonzalez Rojas",
+      "detected_rut": "22.222.222-2",
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": "02/01/1990",
+      "detected_age": 36,
+      "carnet_vigencia": "Vigente (Vence: 10/02/2032)",
+      "antecedentes_status": null
+    },
+    "cedula_frente_vencida": {
+      "detected_name": "Carlos Andres Fuentes Vera",
+      "detected_rut": "15.432.198-K",
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": "15/03/1985",
+      "detected_age": 41,
+      "carnet_vigencia": "Vencido (20/07/2024)",
+      "antecedentes_status": null
+    },
+    "cedula_reverso_mrz": {
+      "detected_name": "Maria Jose Gonzalez Rojas",
+      "detected_rut": "22.222.222-2",
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": "Santiago",
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": "02/01/1990",
+      "detected_age": 36,
+      "carnet_vigencia": "Vigente (Vence: 10/02/2032)",
+      "antecedentes_status": null
+    },
+    "antecedentes_limpio": {
+      "detected_name": "Juan Pablo Perez Soto",
+      "detected_rut": "12.345.678-5",
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": "Vencido (01/06/2026)",
+      "antecedentes_status": "Sin Antecedentes (Al día)"
+    },
+    "antecedentes_con_anotaciones": {
+      "detected_name": "Pedro Antonio Muñoz Diaz",
+      "detected_rut": "11.111.111-1",
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": "Con Anotaciones (Requiere Revisión)"
+    },
+    "credencial_rigger": {
+      "detected_name": null,
+      "detected_rut": "12.345.678-5",
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": "Credencial Rigger Detectada",
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": "Vigente (Vence: 15/08/2027)",
+      "antecedentes_status": null
+    },
+    "ruido_ocr": {
+      "detected_name": null,
+      "detected_rut": null,
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "cv_y_cedula_combinados": {
+      "detected_name": "Carlos Andrés Fuentes Vera",
+      "detected_rut": "15.432.198-K",
+      "detected_email": null,
+      "detected_phone": "+56 9 5555 4444",
+      "detected_city": "Calama",
+      "detected_experience_years": 5,
+      "detected_experience_months": 60,
+      "detected_credencial_status": "Licencia Clase D / Conductor Detectada",
+      "birth_date": "15/03/1985",
+      "detected_age": 41,
+      "carnet_vigencia": "Vencido (20/07/2024)",
+      "antecedentes_status": null
+    },
+    "solo_espacios": {
+      "detected_name": null,
+      "detected_rut": null,
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "vacio": {
+      "detected_name": null,
+      "detected_rut": null,
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    },
+    "null": {
+      "detected_name": null,
+      "detected_rut": null,
+      "detected_email": null,
+      "detected_phone": null,
+      "detected_city": null,
+      "detected_experience_years": null,
+      "detected_experience_months": null,
+      "detected_credencial_status": null,
+      "birth_date": null,
+      "detected_age": null,
+      "carnet_vigencia": null,
+      "antecedentes_status": null
+    }
+  },
+  "splitCvIntoSections": {
+    "cv_rigger": {
+      "HEADER": "JUAN PABLO PÉREZ SOTO\nRigger / Maniobrista Certificado\nRUT: 12.345.678-5\nCorreo: juan.perez@example.invalid\nTeléfono: +56 9 8765 4321\nDirección: Pasaje Los Aromos 123, Rancagua",
+      "CONTACTO": "",
+      "PERFIL": "Rigger con experiencia en maniobras de izaje en faenas mineras. Certificación ChileValora B30.5.",
+      "EXPERIENCIA": "Constructora Andes Ltda. — Rigger\nMarzo 2018 - Actualidad\nManiobras con grúas de hasta 250 toneladas.\nMontajes del Sur SpA — Ayudante de maniobras\n01/2014 - 02/2018",
+      "EDUCACION": "Liceo Industrial de Rancagua 2008 - 2012",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": "Pedro Antonio Muñoz Díaz — Supervisor\nRUT 11.111.111-1 — Teléfono +56 9 1111 2222\n2001 - 2015"
+    },
+    "cv_soldador": {
+      "HEADER": "MARÍA JOSÉ GONZÁLEZ ROJAS\nSoldadora calificada AWS 6G (SMAW / TIG)\nmaria.gonzalez@example.invalid | 9 7654 3210 | Antofagasta",
+      "CONTACTO": "",
+      "PERFIL": "Más de 12 años de experiencia en soldadura de cañerías y estructuras.",
+      "EXPERIENCIA": "Metalúrgica Norte S.A. | Soldadora 6G | Enero 2015 – Diciembre 2022\nServicios Industriales Atacama | Soldadora 3G | 2010 - 2014",
+      "EDUCACION": "Técnico en Soldadura, CFT Regional 2007 - 2009",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "WPQ AWS D1.1 vigente hasta 2027",
+      "REFERENCIAS": ""
+    },
+    "cv_operador": {
+      "HEADER": "Curriculum Vitae\nNombre completo: Carlos Andrés Fuentes Vera\nRUN 15.432.198-K\nFecha de nacimiento: 15 de marzo de 1985\nLicencia de conducir Clase D y A4. Operador de maquinaria pesada: excavadora y cargador frontal.\nCelular: (+56) 9-5555-4444\nCiudad: Calama",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "2019 - 2023 Operador de excavadora, Áridos del Norte\n06/2016 – 12/2018 Operador cargador frontal, Movimientos de Tierra Ltda.",
+      "EDUCACION": "Enseñanza media completa",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "cv_dos_columnas": {
+      "HEADER": "ANA BELÉN TORRES MUÑOZ          EXPERIENCIA\nPrevencionista de riesgos       Minera Ficticia Uno   2020 - presente\nana.torres@example.invalid      Asesora en prevención de riesgos\nContacto: 9 4444 3333           Contratista Dos       2017 - 2020\nCopiapó                         Supervisora HSE\nHABILIDADES                     EDUCACIÓN\nLiderazgo, ISO 45001            Universidad Ficticia de Atacama 2012 - 2016",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "cv_con_instituciones": {
+      "HEADER": "Universidad Adolfo Ibáñez\nConstructora Miguel Morales\nIngeniero Constructor\nNombre: Roberto Ignacio Salinas Paredes\nroberto.salinas@example.invalid\nExperiencia: 5 años como jefe de terreno.\nReferencias: Gerente General Constructora Miguel Morales",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "cv_sin_secciones": {
+      "HEADER": "luis alberto ramírez campos\nmaestro eléctrico sec clase a\nluis.ramirez@example.invalid\ntrabajé en mantención eléctrica desde 2012 hasta 2021 en distintas empresas de la zona de talca",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "cv_meses_abreviados": {
+      "HEADER": "FELIPE ANDRÉS ROJAS LAGOS\nMecánico de equipos pesados\nfelipe.rojas@example.invalid\nPuerto Montt",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "Taller Uno | Ene 2010 - Feb 2011\nTaller Dos | Mar 2011 - Abr 2012\nTaller Tres | May 2012 - Jun 2013\nTaller Cuatro | Jul 2013 - Ago 2014\nTaller Cinco | Sep 2014 - Oct 2015\nTaller Seis | Sept 2015 - Nov 2016\nTaller Siete | Dic 2016 - Mar 2019",
+      "EDUCACION": "Liceo Técnico 2005 - 2008",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "cedula_frente_vigente": {
+      "HEADER": "REPUBLICA DE CHILE\nSERVICIO DE REGISTRO CIVIL E IDENTIFICACION\nCEDULA DE IDENTIDAD\nAPELLIDOS\nGONZALEZ ROJAS\nNOMBRES\nMARIA JOSE\nNACIONALIDAD CHILENA SEXO F\nFECHA DE NACIMIENTO 02 ENE 1990\nFECHA DE EMISION 10 FEB 2022\nFECHA DE VENCIMIENTO 10 FEB 2032\nRUN 22.222.222-2",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "cedula_frente_vencida": {
+      "HEADER": "CEDULA DE IDENTIDAD\nAPELLIDOS\nFUENTES VERA\nNOMBRES\nCARLOS ANDRES\nFECHA DE NACIMIENTO 15/03/1985\nFECHA DE VENCIMIENTO 20/07/2024\nRUN 15.432.198-K",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "cedula_reverso_mrz": {
+      "HEADER": "Nació en: SANTIAGO\nProfesión: OPERADOR\nINCHL2222222223<<<<<<<<<<<<<<<\n9001023F3202105CHL22222222<2<9\nGONZALEZ<ROJAS<<MARIA<JOSE<<<<",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "antecedentes_limpio": {
+      "HEADER": "CERTIFICADO DE ANTECEDENTES\nPARA FINES ESPECIALES\nREGISTRO GENERAL DE CONDENAS\nNombre: JUAN PABLO PEREZ SOTO\nRUN: 12.345.678-5\nFecha de emisión: 01/06/2026\nSIN ANTECEDENTES",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "antecedentes_con_anotaciones": {
+      "HEADER": "CERTIFICADO DE ANTECEDENTES\nNombre: PEDRO ANTONIO MUÑOZ DIAZ\nRUN 11.111.111-1\nREGISTRA ANTECEDENTES\nCausa ROL 1234-2019",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "credencial_rigger": {
+      "HEADER": "CHILEVALORA\nCERTIFICADO DE COMPETENCIAS LABORALES\nSe certifica que JUAN PABLO PEREZ SOTO, RUT 12.345.678-5\nes competente en el perfil RIGGER / MANIOBRISTA DE IZAJE (B30.9)\nVigencia: 15/08/2023 al 15/08/2027",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "ruido_ocr": {
+      "HEADER": "||| ~~ Ro Xt  :: ..\nFOTO OFICIAL Completo Adolfo\n0 0 0 l1l1 ___",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "cv_y_cedula_combinados": {
+      "HEADER": "Curriculum Vitae\nNombre completo: Carlos Andrés Fuentes Vera\nRUN 15.432.198-K\nFecha de nacimiento: 15 de marzo de 1985\nLicencia de conducir Clase D y A4. Operador de maquinaria pesada: excavadora y cargador frontal.\nCelular: (+56) 9-5555-4444\nCiudad: Calama",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "2019 - 2023 Operador de excavadora, Áridos del Norte\n06/2016 – 12/2018 Operador cargador frontal, Movimientos de Tierra Ltda.",
+      "EDUCACION": "Enseñanza media completa\nCEDULA DE IDENTIDAD\nAPELLIDOS\nFUENTES VERA\nNOMBRES\nCARLOS ANDRES\nFECHA DE NACIMIENTO 15/03/1985\nFECHA DE VENCIMIENTO 20/07/2024\nRUN 15.432.198-K",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "solo_espacios": {
+      "HEADER": "",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    },
+    "vacio": {
+      "HEADER": "",
+      "CONTACTO": "",
+      "PERFIL": "",
+      "EXPERIENCIA": "",
+      "EDUCACION": "",
+      "HABILIDADES": "",
+      "CARACTERISTICAS": "",
+      "CURSOS": "",
+      "REFERENCIAS": ""
+    }
+  },
+  "calculateExperienceFromSections": {
+    "cv_rigger": {
+      "years": 8,
+      "months": 100
+    },
+    "cv_soldador": {
+      "years": 12,
+      "months": 144
+    },
+    "cv_operador": {
+      "years": 5,
+      "months": 60
+    },
+    "cv_dos_columnas": {
+      "years": null,
+      "months": null
+    },
+    "cv_con_instituciones": {
+      "years": null,
+      "months": null
+    },
+    "cv_sin_secciones": {
+      "years": null,
+      "months": null
+    },
+    "cv_meses_abreviados": {
+      "years": 9,
+      "months": 111
+    },
+    "cedula_frente_vigente": {
+      "years": null,
+      "months": null
+    },
+    "cedula_frente_vencida": {
+      "years": null,
+      "months": null
+    },
+    "cedula_reverso_mrz": {
+      "years": null,
+      "months": null
+    },
+    "antecedentes_limpio": {
+      "years": null,
+      "months": null
+    },
+    "antecedentes_con_anotaciones": {
+      "years": null,
+      "months": null
+    },
+    "credencial_rigger": {
+      "years": null,
+      "months": null
+    },
+    "ruido_ocr": {
+      "years": null,
+      "months": null
+    },
+    "cv_y_cedula_combinados": {
+      "years": 5,
+      "months": 60
+    },
+    "solo_espacios": {
+      "years": null,
+      "months": null
+    },
+    "vacio": {
+      "years": null,
+      "months": null
+    }
+  },
+  "isValidPersonName": {
+    "42": false,
+    "\"Juan Pablo Pérez Soto\"": true,
+    "\"MARIA JOSE GONZALEZ ROJAS\"": true,
+    "\"Carlos Andrés Fuentes Vera\"": true,
+    "\"José Miguel De la Fuente\"": true,
+    "\"Ana Belén Torres\"": true,
+    "\"Luis\"": false,
+    "\"Ñuño Ñandú\"": true,
+    "\"Universidad Adolfo Ibáñez\"": false,
+    "\"Constructora Miguel Morales\"": false,
+    "\"Adolfo Ibáñez\"": false,
+    "\"Ingeniero Constructor\"": false,
+    "\"Curriculum Vitae\"": false,
+    "\"Experiencia Laboral\"": false,
+    "\"Republica De Chile\"": false,
+    "\"Cedula De Identidad\"": false,
+    "\"Nombre Completo\"": false,
+    "\"Foto Oficial\"": false,
+    "\"Ro Xt\"": false,
+    "\"Juan123 Pérez\"": true,
+    "\"juan.perez@example.invalid\"": false,
+    "\"Pasaje Los Aromos\"": false,
+    "\"Servicio De Registro Civil\"": false,
+    "\"Gerente General\"": false,
+    "\"Minera Ficticia Uno\"": false,
+    "\"Pedro Antonio Muñoz Díaz\"": true,
+    "\"Bernardo O'Higgins\"": false,
+    "\"Arturo Prat\"": false,
+    "\"Lampa\"": false,
+    "\"\"": false,
+    "\"   \"": false,
+    "null": false,
+    "undefined": false
+  },
+  "pickBestPersonName": [
+    {
+      "candidatos": [
+        "Juan Perez",
+        "Juan Pablo Perez Soto",
+        "Universidad Adolfo Ibáñez"
+      ],
+      "referencia": null,
+      "resultado": "Juan Pablo Perez Soto"
+    },
+    {
+      "candidatos": [
+        "Maria Gonzalez",
+        "Pedro Muñoz Diaz"
+      ],
+      "referencia": "maria.gonzalez@example.invalid",
+      "resultado": "Maria Gonzalez"
+    },
+    {
+      "candidatos": [
+        "Carlos Fuentes",
+        "Carlos Andres Fuentes Vera"
+      ],
+      "referencia": "Carlos Andrés Fuentes Vera",
+      "resultado": "Carlos Andres Fuentes Vera"
+    },
+    {
+      "candidatos": [
+        "Constructora Miguel Morales",
+        "Ingeniero Constructor"
+      ],
+      "referencia": null,
+      "resultado": null
+    },
+    {
+      "candidatos": [],
+      "referencia": "Juan Pablo Perez",
+      "resultado": null
+    },
+    {
+      "candidatos": [
+        "",
+        null,
+        "Ana Torres"
+      ],
+      "referencia": null,
+      "resultado": null
+    }
+  ],
+  "extractDatesFromText": {
+    "\"Nació el 02/01/1990 y emitió el 10-02-2022\"": [
+      {
+        "day": 2,
+        "month": 1,
+        "year": 1990
+      },
+      {
+        "day": 10,
+        "month": 2,
+        "year": 2022
+      }
+    ],
+    "\"Fecha 2022.02.10 y 1990/1/2\"": [
+      {
+        "year": 2022,
+        "month": 2,
+        "day": 10
+      },
+      {
+        "year": 1990,
+        "month": 1,
+        "day": 2
+      }
+    ],
+    "\"15 de marzo de 1985\"": [
+      {
+        "day": 15,
+        "month": 3,
+        "year": 1985
+      }
+    ],
+    "\"02 ENE 1990 / 10 FEB 2032\"": [
+      {
+        "day": 2,
+        "month": 1,
+        "year": 1990
+      },
+      {
+        "day": 10,
+        "month": 2,
+        "year": 2032
+      }
+    ],
+    "\"31/02/2020 y 99/99/2020\"": [
+      {
+        "day": 31,
+        "month": 2,
+        "year": 2020
+      }
+    ],
+    "\"Setiembre 2019 – sept. 2021\"": [],
+    "\"15 MAR 2020, 3-ABR-2021, 7.AGO.2022 y 1 DIC 2023\"": [
+      {
+        "day": 15,
+        "month": 3,
+        "year": 2020
+      },
+      {
+        "day": 3,
+        "month": 4,
+        "year": 2021
+      },
+      {
+        "day": 7,
+        "month": 8,
+        "year": 2022
+      },
+      {
+        "day": 1,
+        "month": 12,
+        "year": 2023
+      }
+    ],
+    "\"sin fechas aquí\"": [],
+    "\"\"": []
+  },
+  "parseChileanDate": {
+    "\"02/01/1990\"": "1990-01-02T12:00:00.000Z",
+    "\"2/1/1990\"": "1990-01-02T12:00:00.000Z",
+    "\"02-01-1990\"": "1990-01-02T12:00:00.000Z",
+    "\"1990-01-02\"": "1990-01-02T12:00:00.000Z",
+    "\"02 ENE 1990\"": null,
+    "\"2 de enero de 1990\"": "1990-01-02T12:00:00.000Z",
+    "\"02 de Enero del 1990\"": null,
+    "\"10 FEB 2032\"": "2032-02-10T00:00:00.000Z",
+    "\"31/02/2020\"": null,
+    "\"29/02/2024\"": "2024-02-29T12:00:00.000Z",
+    "\"29/02/2023\"": null,
+    "\"00/01/2020\"": null,
+    "\"15/13/2020\"": null,
+    "\"Vence: 10/05/2030\"": "2030-10-05T00:00:00.000Z",
+    "\"texto\"": null,
+    "\"\"": null,
+    "null": null
+  },
+  "formatRut": {
+    "\"12.345.678-5\"": "12.345.678-5",
+    "\"12345678-5\"": "12.345.678-5",
+    "\"123456785\"": "12.345.678-5",
+    "\"12.345.678-4\"": "12.345.678-4",
+    "\"15.432.198-K\"": "15.432.198-K",
+    "\"15.432.198-k\"": "15.432.198-K",
+    "\"11.111.111-1\"": "11.111.111-1",
+    "\"22.222.222-2\"": "22.222.222-2",
+    "\"1.234.567-4\"": "1.234.567-4",
+    "\"7.654.321-6\"": "7.654.321-6",
+    "\"999.999-9\"": null,
+    "\"1234567\"": null,
+    "\"1234\"": null,
+    "\"abc\"": null,
+    "\"\"": null,
+    "null": null
+  },
+  "isValidChileanRutMod11": {
+    "\"12.345.678-5\"": true,
+    "\"12345678-5\"": true,
+    "\"123456785\"": true,
+    "\"12.345.678-4\"": false,
+    "\"15.432.198-K\"": false,
+    "\"15.432.198-k\"": false,
+    "\"11.111.111-1\"": true,
+    "\"22.222.222-2\"": true,
+    "\"1.234.567-4\"": true,
+    "\"7.654.321-6\"": true,
+    "\"999.999-9\"": false,
+    "\"1234567\"": false,
+    "\"1234\"": false,
+    "\"abc\"": false,
+    "\"\"": false,
+    "null": false
+  },
+  "formatTitleCase": {
+    "\"  José Ñandú-Pérez, 3° \"": "José Ñandú-pérez, 3°",
+    "\"MARÍA   josé   GONZÁLEZ\"": "María José González",
+    "\"<script>alert('x')</script> & \\\"y\\\"\"": "<script>alert('x')</script> & \"y\"",
+    "\"Línea\\ncon\\tsaltos\"": "Línea Con Saltos",
+    "\"\"": "",
+    "null": ""
+  },
+  "normalizeTextForMatch": {
+    "\"  José Ñandú-Pérez, 3° \"": "JOSE NANDU PEREZ 3",
+    "\"MARÍA   josé   GONZÁLEZ\"": "MARIA JOSE GONZALEZ",
+    "\"<script>alert('x')</script> & \\\"y\\\"\"": "SCRIPT ALERT X SCRIPT Y",
+    "\"Línea\\ncon\\tsaltos\"": "LINEA CON SALTOS",
+    "\"\"": "",
+    "null": ""
+  },
+  "escapeHtml": {
+    "\"  José Ñandú-Pérez, 3° \"": "  José Ñandú-Pérez, 3° ",
+    "\"MARÍA   josé   GONZÁLEZ\"": "MARÍA   josé   GONZÁLEZ",
+    "\"<script>alert('x')</script> & \\\"y\\\"\"": "&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt; &amp; &quot;y&quot;",
+    "\"Línea\\ncon\\tsaltos\"": "Línea\ncon\tsaltos",
+    "\"\"": "",
+    "null": ""
+  },
+  "VALID_STATES": [
+    "POSTULADO",
+    "DESCARTADO_TECNICO",
+    "PRESELECCIONADO",
+    "APROBADO_FAENA",
+    "DOCS_CARGADOS",
+    "EN_REVISION_MANUAL",
+    "PRE_ACREDITADO",
+    "CONTRATADO_FAENA",
+    "Pendiente",
+    "Aprobado",
+    "Rechazado"
+  ]
+}

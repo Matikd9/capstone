@@ -47,7 +47,14 @@ npm test                        # Pruebas unitarias y de integración (BD local 
 
 ## Arquitectura
 
-**Monolito Express** en `src/server.js` (~4500 líneas): configuración de BD, `initDB()` (conexión + migraciones + semillas), todo el parser OCR local (heurísticas de RUT, nombres, fechas chilenas, cálculo de experiencia desde secciones del CV) y todas las rutas `/api/*`. Módulos satélite (CommonJS):
+**Monolito Express** en `src/server.js` (~2750 líneas): middlewares, `initDB()` (conexión + migraciones + semillas), `saveBase64File()`, el OCR local (Poppler/Ghostscript/ImageMagick + Tesseract, `runTesseractOnFiles()`), `reprocessCandidateOcr()` y todas las rutas `/api/*`. Re-exporta las utilidades movidas (las pruebas las importan desde `server.js`). Módulos extraídos (tarea 1.7, código movido sin cambios; dependencias en un solo sentido: `config` y `shared` → `cv` → `server`):
+- `src/config/` — `env.js` (carga `.env` / `.env.production`; debe ser el primer `require` de `server.js`), `database.js` (`dbConfig`; en producción exige `DB_HOST`/`DB_USER`/`DB_PASSWORD` al cargarse; `initDB()` modifica `dbConfig.host`, por eso se exporta el mismo objeto), `uploads.js` (`UPLOADS_DIR`, lo crea si no existe).
+- `src/shared/` — sin dependencias: `text.js` (`escapeHtml`, `formatTitleCase`, `normalizeTextForMatch`), `rut.js` (`formatRut`, `isValidChileanRutMod11`), `dates.js` (`MONTH_MAP`, `extractDatesFromText`, `parseChileanDate`), `candidateStates.js` (`VALID_STATES`).
+- `src/cv/` — parser de CV y documentos: `names.js` (listas de palabras, `isValidPersonName`, `pickBestPersonName`), `experience.js` (`splitCvIntoSections`, `calculateExperienceFromSections`), `parser.js` (`parseExtractedText`, una sola función de ~490 líneas).
+- Red de seguridad: `tests/unit/caracterizacion.test.js` compara las salidas del parser y las utilidades con `tests/fixtures/caracterizacion.snapshot.json` (reloj fijo, TZ UTC, datos sintéticos). Regenerarla (`UPDATE_SNAPSHOT=1`) solo ante un cambio de comportamiento intencional y revisado.
+- Problemas conocidos fuera de alcance: `docs/pendientes-tarea-1.7.md`.
+
+Módulos satélite (CommonJS):
 - `src/geminiOcr.js` — OCR vía Gemini REST con JSON schema; rota entre una lista de modelos ante 429/503/402. Si no hay `GEMINI_API_KEY`, `server.js` usa el fallback local: `pdftotext` (Poppler, vía `execFileSync`) + Tesseract.js con `spa.traineddata` en la raíz.
 - `src/auth.js` — scrypt + JWT HMAC-SHA256 hecho a mano con `crypto`; `requireAdminAuth` protege `/api/admin/*`; `initAdminAuth(pool)` crea el usuario admin por defecto (las tablas las crea la migración 001).
 - `src/mailer.js` — nodemailer; genera el token del magic link (7 días) y envía invitación de Fase 2 / confirmación de contratación. Sin credenciales SMTP el transporter es `null`.
@@ -57,7 +64,7 @@ npm test                        # Pruebas unitarias y de integración (BD local 
 
 **Archivos subidos**: llegan como base64 en JSON (límite 50mb), se guardan con `saveBase64File()` en `storage/uploads/` (privado, fuera de `public/`) y se respaldan en la tabla `file_storage` (BLOB). `GET /api/files/:filename` sirve desde disco y, si no existe (disco efímero de Cloud Run), recupera desde la BD.
 
-**Máquina de estados** de `candidates.status` (lista `VALID_STATES` en `server.js`): `POSTULADO` → `PRESELECCIONADO` | `DESCARTADO_TECNICO` (test ≥80% y 2/2 SJT + experiencia mínima) → `APROBADO_FAENA` (RR.HH. aprueba, se emite magic link) → `DOCS_CARGADOS` → `PRE_ACREDITADO` | `EN_REVISION_MANUAL` (cruce OCR Fase 1 vs Cédula/Antecedentes) → `CONTRATADO_FAENA`. Se conservan estados legacy (`Pendiente`, `Aprobado`, `Rechazado`).
+**Máquina de estados** de `candidates.status` (lista `VALID_STATES` en `src/shared/candidateStates.js`): `POSTULADO` → `PRESELECCIONADO` | `DESCARTADO_TECNICO` (test ≥80% y 2/2 SJT + experiencia mínima) → `APROBADO_FAENA` (RR.HH. aprueba, se emite magic link) → `DOCS_CARGADOS` → `PRE_ACREDITADO` | `EN_REVISION_MANUAL` (cruce OCR Fase 1 vs Cédula/Antecedentes) → `CONTRATADO_FAENA`. Se conservan estados legacy (`Pendiente`, `Aprobado`, `Rechazado`).
 
 **Esquema**: migraciones SQL numeradas en `src/db/migrations/NNN_nombre.sql`, aplicadas por `src/db/migrate.js` al arrancar (`initDB()` → `runMigrations`). Registro en `schema_migrations` (id, checksum SHA-256, `baselined`); lock con `GET_LOCK`. `001_baseline.sql` es el esquema base: en una BD existente sin registro se compara contra `information_schema` (tipos, nulabilidad, defaults, índices, únicos, FK, motor, CHECK/triggers) y solo se registra si no hay diferencias **críticas**; las de **revisar** quedan en el log. Nunca modifica el esquema para hacerlo coincidir. Para cambiar el esquema: crear un archivo nuevo con el siguiente número; nunca editar una migración ya aplicada (el checksum lo rechaza). Marcas en comentarios antes de una sentencia: `@tidb-only` (solo TiDB), `-- @verifica: SELECT ...` (verdadero si el efecto ya está) o `-- @idempotente`. Cada sentencia necesita verificación: se deriva sola para `CREATE TABLE`, `ADD COLUMN`, `MODIFY COLUMN` y `CREATE INDEX` de una sola cláusula; si no, el archivo se rechaza. El DDL no es transaccional: el avance queda en `schema_migration_runs` y, al reintentar, las sentencias cuyo efecto ya está se omiten; si el estado no es un prefijo aplicado, se detiene y pide intervención manual. Procedimiento para producción: `docs/migraciones-produccion.md`. `src/db/seeds/index.js` (`ensureSeedData()`) sincroniza cargos y banco de preguntas (TECNICA / SJT) en cada arranque.
 
@@ -65,7 +72,7 @@ npm test                        # Pruebas unitarias y de integración (BD local 
 
 ## Entornos
 
-- `require("dotenv").config()` carga `.env`; si `DB_HOST` no está definido y existe `.env.production`, carga ese archivo.
+- `src/config/env.js` carga `.env`; si `DB_HOST` no está definido y existe `.env.production`, carga ese archivo.
 - SSL se activa si `DB_SSL=true`, el host contiene `tidbcloud.com`, o `NODE_ENV=production` sin socket `/cloudsql/`. TiDB se detecta por host o `DB_PORT=4000`.
 - Producción: Cloud Run (`Dockerfile`, puerto 8080, `trust proxy` activado) + TiDB Cloud Serverless. `AUTO_ID_CACHE = 10` en `candidates` evita saltos grandes de folios en TiDB.
 - Rate limits: general `/api/` 300/15min, `/api/ocr/` 30/15min, login 15/15min.

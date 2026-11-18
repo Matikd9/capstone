@@ -298,28 +298,6 @@ async function initAdminAuth(pool) {
   authPool = pool;
   const conn = await pool.getConnection();
   try {
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS admin_users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(50) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        full_name VARCHAR(150) NOT NULL,
-        role VARCHAR(30) DEFAULT 'RRHH',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB;
-    `);
-
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS admin_sessions (
-        token_hash CHAR(64) PRIMARY KEY,
-        admin_id INT NOT NULL,
-        expires_at DATETIME NOT NULL,
-        revoked_at DATETIME NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_admin_sessions_admin (admin_id)
-      ) ENGINE=InnoDB;
-    `);
-
     // Comprobar si existe el usuario 'admin'
     const [rows] = await conn.query(
       "SELECT id, password_hash FROM admin_users WHERE username = ?",

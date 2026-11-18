@@ -25,6 +25,8 @@ const helmet = require("helmet");
 const { AppError, errorHandler, notFoundApi, redact } = require("./errors");
 const { schemas, validate } = require("./validation");
 const documentDecision = require("./documentDecision");
+const { runMigrations } = require("./db/migrate");
+const { ensureSeedData } = require("./db/seeds");
 
 // Evitar que errores asíncronos internos de workers OCR tumben el proceso Node.js
 let serverListening = false;
@@ -254,6 +256,8 @@ async function initDB(retries = 10, delay = 3000) {
     ? "PRODUCCIÓN (TiDB Cloud)"
     : "DESARROLLO LOCAL (MySQL)";
 
+  let connected = false;
+  let lastError = null;
   for (let i = 0; i < retries; i++) {
     try {
       console.log(
@@ -286,204 +290,10 @@ async function initDB(retries = 10, delay = 3000) {
         }
       }
 
-      const conn = await pool.getConnection();
-
-      // Crear tablas base
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS positions (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          name VARCHAR(100) NOT NULL,
-          description TEXT,
-          required_credential VARCHAR(150),
-          min_experience_years INT DEFAULT 2,
-          ecf_code VARCHAR(80)
-        ) ENGINE=InnoDB;
-      `);
-
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS questions (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          position_id INT NOT NULL,
-          question_text TEXT NOT NULL,
-          option_a VARCHAR(255) NOT NULL,
-          option_b VARCHAR(255) NOT NULL,
-          option_c VARCHAR(255) NOT NULL,
-          option_d VARCHAR(255) NOT NULL,
-          correct_option CHAR(1) NOT NULL,
-          FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB;
-      `);
-
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS candidates (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          full_name VARCHAR(150) NOT NULL,
-          rut_id VARCHAR(50) NOT NULL,
-          age INT DEFAULT 30,
-          position_id INT NOT NULL,
-          cert_file VARCHAR(255),
-          antecedentes_file VARCHAR(255),
-          initial_selfie VARCHAR(255),
-          random_selfie VARCHAR(255),
-          facial_match_ok TINYINT(1) DEFAULT NULL,
-          facial_confidence INT DEFAULT NULL,
-          score INT DEFAULT 0,
-          total_questions INT DEFAULT 0,
-          audio_file VARCHAR(255),
-          status VARCHAR(50) DEFAULT 'POSTULADO',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (position_id) REFERENCES positions(id)
-        ) ENGINE=InnoDB;
-      `);
-
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS candidate_answers (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          candidate_id INT NOT NULL,
-          question_id INT NOT NULL,
-          selected_option CHAR(1) NOT NULL,
-          is_correct BOOLEAN NOT NULL,
-          FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE,
-          FOREIGN KEY (question_id) REFERENCES questions(id)
-        ) ENGINE=InnoDB;
-      `);
-
-      // Tabla de almacenamiento persistente en la nube (TiDB Cloud)
-      // Evita la pérdida de archivos cuando los contenedores de Cloud Run se apagan o reinician
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS file_storage (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          filename VARCHAR(255) NOT NULL UNIQUE,
-          mime_type VARCHAR(100),
-          file_data LONGBLOB NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB;
-      `);
-
-      // Migraciones seguras para soportar la Máquina de Estados y el Funnel de 4 Fases
-      try {
-        await conn.query(
-          "ALTER TABLE candidates MODIFY COLUMN status VARCHAR(50) DEFAULT 'POSTULADO'",
-        );
-      } catch (e) {}
-      try {
-        await conn.query(
-          "ALTER TABLE candidates MODIFY COLUMN age INT DEFAULT 30",
-        );
-      } catch (e) {}
-      // TiDB Cloud Serverless: Configurar AUTO_ID_CACHE bajo para evitar saltos de 30.000 en folios
-      try {
-        await conn.query("ALTER TABLE candidates AUTO_ID_CACHE = 10");
-      } catch (e) {}
-
-      // Migraciones en questions para categoría SJT / TECNICA y posición opcional
-      try {
-        await conn.query(
-          "ALTER TABLE questions MODIFY COLUMN position_id INT NULL",
-        );
-      } catch (e) {}
-      try {
-        await conn.query(
-          "ALTER TABLE questions ADD COLUMN category VARCHAR(30) DEFAULT 'TECNICA'",
-        );
-      } catch (e) {}
-
-      const positionMigrations = [
-        "ALTER TABLE positions ADD COLUMN required_credential VARCHAR(150)",
-        "ALTER TABLE positions ADD COLUMN min_experience_years INT DEFAULT 2",
-        "ALTER TABLE positions ADD COLUMN ecf_code VARCHAR(80)",
-      ];
-      for (const sql of positionMigrations) {
-        try {
-          await conn.query(sql);
-        } catch (e) {}
-      }
-
-      const candidateMigrations = [
-        "ALTER TABLE candidates ADD COLUMN email VARCHAR(150)",
-        "ALTER TABLE candidates ADD COLUMN phone VARCHAR(50)",
-        "ALTER TABLE candidates ADD COLUMN city VARCHAR(100)",
-        "ALTER TABLE candidates ADD COLUMN experience_years INT DEFAULT 0",
-        "ALTER TABLE candidates ADD COLUMN cv_file VARCHAR(255)",
-        "ALTER TABLE candidates ADD COLUMN credencial_file VARCHAR(255)",
-        "ALTER TABLE candidates ADD COLUMN carnet_file VARCHAR(255)",
-        "ALTER TABLE candidates ADD COLUMN carnet_back_file VARCHAR(255)",
-        "ALTER TABLE candidates ADD COLUMN ocr_text TEXT",
-        "ALTER TABLE candidates ADD COLUMN ocr_birth_date VARCHAR(50)",
-        "ALTER TABLE candidates ADD COLUMN ocr_detected_age INT",
-        "ALTER TABLE candidates ADD COLUMN ocr_verified BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE candidates ADD COLUMN ocr_detected_name VARCHAR(150)",
-        "ALTER TABLE candidates ADD COLUMN ocr_detected_rut VARCHAR(50)",
-        "ALTER TABLE candidates ADD COLUMN ocr_credencial_status VARCHAR(100)",
-        "ALTER TABLE candidates ADD COLUMN ocr_antecedentes_status VARCHAR(80)",
-        "ALTER TABLE candidates ADD COLUMN ocr_carnet_vigencia VARCHAR(80)",
-        "ALTER TABLE candidates ADD COLUMN ocr_cross_check_ok BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE candidates ADD COLUMN ocr_manually_edited BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE candidates ADD COLUMN ocr_edited_fields VARCHAR(255)",
-        "ALTER TABLE candidates ADD COLUMN discrepancy_notes TEXT",
-        "ALTER TABLE candidates ADD COLUMN consent_proctoring BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE candidates ADD COLUMN consent_ley19628 BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE candidates ADD COLUMN score_tecnico INT DEFAULT 0",
-        "ALTER TABLE candidates ADD COLUMN score_sjt INT DEFAULT 0",
-        "ALTER TABLE candidates ADD COLUMN sjt_conforme BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE candidates ADD COLUMN access_token VARCHAR(64)",
-        "ALTER TABLE candidates ADD COLUMN token_expires_at DATETIME",
-        "ALTER TABLE candidates ADD COLUMN token_used_at DATETIME",
-        "ALTER TABLE candidates ADD COLUMN phase2_submitted_at DATETIME",
-        "ALTER TABLE candidates ADD COLUMN experience_years_in_role INT DEFAULT 0",
-        "ALTER TABLE candidates ADD COLUMN role_fit_percentage INT DEFAULT 0",
-        "ALTER TABLE candidates ADD COLUMN detected_skills TEXT",
-        "ALTER TABLE candidates ADD COLUMN role_fit_verdict VARCHAR(255)",
-      ];
-      for (const sql of candidateMigrations) {
-        try {
-          await conn.query(sql);
-        } catch (e) {}
-      }
-
-      try {
-        await conn.query(
-          "ALTER TABLE candidates ADD COLUMN IF NOT EXISTS facial_match_ok TINYINT(1) DEFAULT NULL;",
-        );
-      } catch (e) {
-        try {
-          await conn.query(
-            "ALTER TABLE candidates ADD COLUMN facial_match_ok TINYINT(1) DEFAULT NULL;",
-          );
-        } catch (e2) {}
-      }
-      try {
-        await conn.query(
-          "ALTER TABLE candidates ADD COLUMN IF NOT EXISTS facial_confidence INT DEFAULT NULL;",
-        );
-      } catch (e) {
-        try {
-          await conn.query(
-            "ALTER TABLE candidates ADD COLUMN facial_confidence INT DEFAULT NULL;",
-          );
-        } catch (e2) {}
-      }
-
-      // Asegurar índice único en access_token de forma idempotente
-      try {
-        await conn.query(
-          "ALTER TABLE candidates ADD UNIQUE INDEX uq_candidates_access_token (access_token)",
-        );
-      } catch (idxErr) {}
-
-      console.log(
-        "[DB] Tablas y Máquina de Estados MySQL verificadas exitosamente.",
-      );
-
-      // Poblar o actualizar datos semilla de cargos y preguntas (5-8 preguntas por cargo)
-      await ensureSeedData(conn);
-
-      // Inicializar y asegurar tabla de usuarios de administración (admin / papa123)
-      await auth.initAdminAuth(pool);
-
-      conn.release();
-      return;
+      connected = true;
+      break;
     } catch (err) {
+      lastError = err;
       console.error(`[DB Error] ${err.message}`);
       if (err.code === "ENOTFOUND" && dbConfig.host === "db") {
         console.warn(
@@ -496,220 +306,40 @@ async function initDB(retries = 10, delay = 3000) {
       }
     }
   }
-}
-
-async function ensureSeedData(conn) {
-  const [posRows] = await conn.query("SELECT COUNT(*) as count FROM positions");
-  if (posRows[0].count === 0) {
-    console.log(
-      "[DB Seed] Poblando cargos y banco de preguntas ECF Codelco El Teniente...",
+  if (!connected) {
+    throw new Error(
+      `No se pudo conectar a la base de datos tras ${retries} intentos (último error: ${lastError ? lastError.message : "desconocido"}).`,
     );
+  }
 
-    // 1. Rigger
-    const [res1] = await conn.query(
-      "INSERT INTO positions (name, description, required_credential, min_experience_years, ecf_code) VALUES (?, ?, ?, ?, ?)",
-      [
-        "Rigger (Maniobrista de Izaje)",
-        "Especialista en maniobras de izaje, cálculo de cargas y señales de seguridad para grúas en paradas de planta (División El Teniente).",
-        "Credencial Rigger Acreditada (ASME / ChileValora / OTEC)",
-        2,
-        "ECF N° 7 Codelco — Cargas Suspendidas e Izaje",
-      ],
-    );
-    await insertQuestionsForPosition(conn, res1.insertId, "rigger");
+  // Esquema: migraciones numeradas en src/db/migrations. Si una falla, el error se propaga y el servidor no arranca.
+  await runMigrations(pool);
 
-    // 2. Soldador
-    const [res2] = await conn.query(
-      "INSERT INTO positions (name, description, required_credential, min_experience_years, ecf_code) VALUES (?, ?, ?, ?, ?)",
-      [
-        "Soldador de Mantención Minera (WPQ)",
-        "Soldador calificado para reparación de estructuras pesadas, chutes, baldes y tuberías en planta concentradora.",
-        "Calificación de Soldador Vigente (WPQ / 3G, 4G o 6G - AWS)",
-        2,
-        "ECF N° 6 Codelco — Incendio & Trabajo en Caliente",
-      ],
-    );
-    await insertQuestionsForPosition(conn, res2.insertId, "soldador");
-
-    // 3. Operador
-    const [res3] = await conn.query(
-      "INSERT INTO positions (name, description, required_credential, min_experience_years, ecf_code) VALUES (?, ?, ?, ?, ?)",
-      [
-        "Operador de Maquinaria Pesada",
-        "Operador de cargador frontal, excavadora y equipos de apoyo en faenas de montaje y mantenimiento minero.",
-        "Licencia Municipal Clase D / A4 Vigente + Hoja de Vida del Conductor",
-        3,
-        "ECF N° 3 Codelco — Maquinaria Industrial Pesada",
-      ],
-    );
-    await insertQuestionsForPosition(conn, res3.insertId, "operador");
-
-    console.log("[DB Seed] Banco de preguntas ECF poblado con éxito.");
-  } else {
-    // Asegurar metadata ECF y preguntas técnicas específicas para cada cargo
-    const [positions] = await conn.query(
-      "SELECT * FROM positions ORDER BY id ASC",
-    );
-    for (const p of positions) {
-      if (!p.required_credential) {
-        if (/rigger/i.test(p.name)) {
-          await conn.query(
-            "UPDATE positions SET required_credential = ?, min_experience_years = 2, ecf_code = ? WHERE id = ?",
-            [
-              "Credencial Rigger Acreditada (ASME / ChileValora / OTEC)",
-              "ECF N° 7 Codelco — Cargas Suspendidas e Izaje",
-              p.id,
-            ],
-          );
-        } else if (/soldador/i.test(p.name)) {
-          await conn.query(
-            "UPDATE positions SET required_credential = ?, min_experience_years = 2, ecf_code = ? WHERE id = ?",
-            [
-              "Calificación de Soldador Vigente (WPQ / 3G, 4G o 6G - AWS)",
-              "ECF N° 6 Codelco — Incendio & Trabajo en Caliente",
-              p.id,
-            ],
-          );
-        } else {
-          await conn.query(
-            "UPDATE positions SET required_credential = ?, min_experience_years = 3, ecf_code = ? WHERE id = ?",
-            [
-              "Licencia Municipal Clase D / A4 Vigente + Hoja de Vida del Conductor",
-              "ECF N° 3 Codelco — Maquinaria Industrial Pesada",
-              p.id,
-            ],
-          );
-        }
+  // Datos semilla OBLIGATORIOS: cargos, banco de preguntas (TECNICA / SJT) y módulo de administradores
+  // (initAdminAuth deja lista la autenticación; crear el usuario "admin" depende de ADMIN_DEFAULT_PASSWORD y solo avisa).
+  // Sin ellos el portal no puede evaluar postulantes: si fallan, el arranque se detiene.
+  try {
+    const conn = await pool.getConnection();
+    try {
+      await ensureSeedData(conn);
+      const [[seeded]] = await conn.query(
+        `SELECT (SELECT COUNT(*) FROM positions) AS cargos,
+                (SELECT COUNT(*) FROM questions WHERE category = 'TECNICA') AS tecnicas,
+                (SELECT COUNT(*) FROM questions WHERE category = 'SJT') AS sjt`,
+      );
+      if (!(seeded.cargos > 0 && seeded.tecnicas > 0 && seeded.sjt > 0)) {
+        throw new Error(
+          `faltan datos (cargos=${seeded.cargos}, preguntas TECNICA=${seeded.tecnicas}, SJT=${seeded.sjt})`,
+        );
       }
-
-      const type = /rigger/i.test(p.name)
-        ? "rigger"
-        : /soldador/i.test(p.name)
-          ? "soldador"
-          : "operador";
-      await insertQuestionsForPosition(conn, p.id, type);
+    } finally {
+      conn.release();
     }
-  }
-
-  // 2. Asegurar banco transversal de Juicio Situacional (SJT ECF / Paso Cero)
-  const [sjtRows] = await conn.query(
-    "SELECT COUNT(*) as c FROM questions WHERE category = 'SJT'",
-  );
-  if (sjtRows[0].c < 2) {
-    await conn.query(
-      `INSERT INTO questions (position_id, question_text, option_a, option_b, option_c, option_d, correct_option, category) VALUES
-      (NULL, 'El supervisor le pide ejecutar un izaje saltándose el check-list del ART porque el camión pluma debe abandonar la faena en 10 minutos. ¿Qué acción corresponde aplicar?', 'Ejecutar la maniobra rápido para no frenar la parada.', 'Aplicar el \\'Paso Cero\\' / Derecho a Decir NO, negándose a operar sin el ART completo y firmado', 'Pedir autorización verbal al operador de la grúa.', 'Llenar el documento después de terminar el izaje.', 'B', 'SJT'),
-      (NULL, 'Durante la maniobra, detecta que una de las patas estabilizadoras de la grúa cedió levemente en terreno blando no señalizado. ¿Cuál es la conducta inmediata?', 'Compensar con contrapesos y seguir.', 'Detener la maniobra al instante, asegurar la carga y dar aviso de la condición de falla', 'Apurar la descarga antes de que ceda más.', 'Ignorar si el inclinómetro de la cabina sigue en rango amarillo.', 'B', 'SJT')`,
+    await auth.initAdminAuth(pool);
+  } catch (seedErr) {
+    throw new Error(
+      `No se inicializaron los datos semilla obligatorios: ${seedErr.message}`,
     );
-    console.log(
-      "[DB Seed] Banco transversal de Juicio Situacional (SJT ECF) poblado.",
-    );
-  }
-}
-
-async function insertQuestionsForPosition(conn, posId, type) {
-  const [existing] = await conn.query(
-    "SELECT id FROM questions WHERE position_id = ? ORDER BY id ASC",
-    [posId],
-  );
-
-  let qList = [];
-  if (type === "rigger") {
-    qList = [
-      {
-        text: "¿Cuál es el ángulo mínimo recomendado entre las eslingas y la horizontal en una maniobra de izaje estándar?",
-        a: "30°",
-        b: "45°",
-        c: "60°",
-        d: "15°",
-        correct: "C",
-      },
-      {
-        text: "Al inspeccionar una eslinga sintética antes del izaje, ¿qué defecto obliga a descartarla de inmediato según norma ASME B30.9?",
-        a: "Pérdida de etiqueta de capacidad o corte visible",
-        b: "Suciedad superficial",
-        c: "Decoloración por luz solar",
-        d: "Costura doble en el ojo",
-        correct: "A",
-      },
-      {
-        text: "¿Qué elemento es mandatorio para guiar una carga suspendida cerca de estructuras en parada de planta?",
-        a: "Guantes de cuero",
-        b: "Vientos (cuerdas guía) de longitud adecuada",
-        c: "Señalero sin radio",
-        d: "Apoyo manual directo",
-        correct: "B",
-      },
-    ];
-  } else if (type === "soldador") {
-    qList = [
-      {
-        text: "En soldadura MIG/MAG (GMAW) para reparación estructural pesada, ¿cuál es la función principal del gas de protección (mezcla Ar/CO2)?",
-        a: "Enfriar rápidamente el metal base",
-        b: "Proteger el baño de fusión contra la contaminación atmosférica (oxígeno/nitrógeno)",
-        c: "Incrementar la tensión del arco eléctrico",
-        d: "Desprender la escoria gruesa del cordón",
-        correct: "B",
-      },
-      {
-        text: 'En calificación de soldadores bajo código AWS D1.1 / ASME IX, ¿qué posición de soldadura representa la sigla "4G" en plancha?',
-        a: "Posición plana",
-        b: "Posición horizontal",
-        c: "Posición sobrecabeza (techo)",
-        d: "Posición vertical ascendente",
-        correct: "C",
-      },
-      {
-        text: "¿Cuál es el propósito técnico de realizar precalentamiento controlado en aceros de alta resistencia o alto carbono antes de soldar?",
-        a: "Ahorrar consumo de electrodos",
-        b: "Disminuir la velocidad de enfriamiento para evitar fisuración inducida por hidrógeno en la ZAC",
-        c: "Eliminar la necesidad de limpieza mecánica",
-        d: "Aumentar la deformación térmica de la pieza",
-        correct: "B",
-      },
-    ];
-  } else {
-    qList = [
-      {
-        text: "Durante la inspección pre-operacional (vuelta del perro 360°), si detecta una fuga activa en una manguera hidráulica de dirección o frenos, ¿cuál es el protocolo obligatorio?",
-        a: "Rellenar aceite hidráulico y operar hasta el cambio de turno",
-        b: "No operar el equipo, aplicar bloqueo/etiquetado de falla y reportar a supervisión/mantención",
-        c: "Colocar un paño absorbente amarrado y continuar",
-        d: "Operar solo en terreno plano",
-        correct: "B",
-      },
-      {
-        text: "Al descender por una rampa pronunciada en faena minera con el equipo pesado cargado, ¿cuál es la técnica correcta de operación segura?",
-        a: "Bajar en neutro controlando solo con el freno de servicio",
-        b: "Mantener marcha baja enganchada, usar retardador/freno de motor y llevar el implemento (balde) bajo y controlado",
-        c: "Usar la marcha más alta para reducir revoluciones del motor",
-        d: "Apagar el motor para ahorrar combustible",
-        correct: "B",
-      },
-      {
-        text: "Si operando maquinaria pesada en una pendiente sufre una pérdida repentina de presión en el sistema de frenos principales, ¿cuál es la maniobra inmediata de emergencia?",
-        a: "Saltar de la cabina con el equipo en movimiento",
-        b: "Bajar inmediatamente el balde/implemento al suelo, activar freno de emergencia y dirigir el equipo hacia el pretil o berma de contención",
-        c: "Poner marcha atrás de golpe a alta velocidad",
-        d: "Girar bruscamente hacia el borde libre del banco",
-        correct: "B",
-      },
-    ];
-  }
-
-  for (let i = 0; i < qList.length; i++) {
-    const q = qList[i];
-    if (existing[i]) {
-      await conn.query(
-        'UPDATE questions SET question_text = ?, option_a = ?, option_b = ?, option_c = ?, option_d = ?, correct_option = ?, category = "TECNICA" WHERE id = ?',
-        [q.text, q.a, q.b, q.c, q.d, q.correct, existing[i].id],
-      );
-    } else {
-      await conn.query(
-        'INSERT INTO questions (position_id, question_text, option_a, option_b, option_c, option_d, correct_option, category) VALUES (?, ?, ?, ?, ?, ?, ?, "TECNICA")',
-        [posId, q.text, q.a, q.b, q.c, q.d, q.correct],
-      );
-    }
   }
 }
 
@@ -3912,62 +3542,14 @@ app.post(
       const candidate = candRows[0];
       const { token, expiresAt } = mailer.generateAccessToken(7);
 
-      try {
-        await pool.query(
-          `UPDATE candidates 
-         SET status = 'APROBADO_FAENA', 
-             access_token = ?, 
-             token_expires_at = ? 
-         WHERE id = ?`,
-          [token, expiresAt, id],
-        );
-      } catch (dbErr) {
-        if (
-          dbErr.code === "ER_BAD_FIELD_ERROR" ||
-          (dbErr.message && dbErr.message.includes("access_token"))
-        ) {
-          console.warn(
-            "[DB Auto-Healing] Columna access_token no detectada en candidatos. Aplicando migración dinámica en caliente...",
-          );
-          try {
-            await pool.query(
-              "ALTER TABLE candidates ADD COLUMN access_token VARCHAR(64)",
-            );
-          } catch (e) {}
-          try {
-            await pool.query(
-              "ALTER TABLE candidates ADD UNIQUE INDEX uq_candidates_access_token (access_token)",
-            );
-          } catch (e) {}
-          try {
-            await pool.query(
-              "ALTER TABLE candidates ADD COLUMN token_expires_at DATETIME",
-            );
-          } catch (e) {}
-          try {
-            await pool.query(
-              "ALTER TABLE candidates ADD COLUMN token_used_at DATETIME",
-            );
-          } catch (e) {}
-          try {
-            await pool.query(
-              "ALTER TABLE candidates ADD COLUMN phase2_submitted_at DATETIME",
-            );
-          } catch (e) {}
-
-          // Reintentar actualización tras auto-healing
-          await pool.query(
-            `UPDATE candidates 
-           SET status = 'APROBADO_FAENA', 
-               access_token = ?, 
-               token_expires_at = ? 
-           WHERE id = ?`,
-            [token, expiresAt, id],
-          );
-        } else {
-          throw dbErr;
-        }
-      }
+      await pool.query(
+        `UPDATE candidates 
+       SET status = 'APROBADO_FAENA', 
+           access_token = ?, 
+           token_expires_at = ? 
+       WHERE id = ?`,
+        [token, expiresAt, id],
+      );
 
       const protocol = req.protocol;
       const host = req.get("host");
@@ -4556,44 +4138,56 @@ app.post(
 app.use("/api/", notFoundApi);
 app.use(errorHandler);
 
+// Arranque fail-fast: el puerto solo se abre si la BD conecta, las migraciones terminan y los datos
+// semilla obligatorios están cargados. Cualquier fallo ahí detiene el proceso con código 1.
+async function main(portToUse) {
+  try {
+    await initDB();
+  } catch (dbErr) {
+    console.error(`[Arranque] Detenido: ${redact(dbErr.message)}`);
+    process.exit(1);
+  }
+  startServer(portToUse);
+}
+
 function startServer(portToUse) {
   const server = app.listen(portToUse, async () => {
     serverListening = true;
     console.log(
       `[Servidor] Portal de Convocatoria y Pre-Filtro Normativo Nexxo S.A. listo en http://localhost:${portToUse}`,
     );
-    await initDB();
+    // Tarea OPCIONAL de arranque (auto-reparación OCR): si falla se informa y la aplicación sigue operativa.
     try {
-      if (pool) {
-        const [rows] = await pool.query(
-          "SELECT id, full_name, city, ocr_detected_name, discrepancy_notes, ocr_edited_fields FROM candidates",
+      const [rows] = await pool.query(
+        "SELECT id, full_name, city, ocr_detected_name, discrepancy_notes, ocr_edited_fields FROM candidates",
+      );
+      for (const r of rows) {
+        const hasInvalidFullName = !isValidPersonName(r.full_name);
+        const hasInvalidOcrName = Boolean(
+          r.ocr_detected_name && !isValidPersonName(r.ocr_detected_name),
         );
-        for (const r of rows) {
-          const hasInvalidFullName = !isValidPersonName(r.full_name);
-          const hasInvalidOcrName = Boolean(
-            r.ocr_detected_name && !isValidPersonName(r.ocr_detected_name),
+        const hasLegacyNoise = /(Adolfo|Completo|Ro Xt)/i.test(
+          `${r.discrepancy_notes || ""} ${r.ocr_edited_fields || ""}`,
+        );
+        const hasWorkplaceCityBug = Boolean(
+          r.city && /^lampa$/i.test(r.city.trim()),
+        );
+        if (
+          hasInvalidFullName ||
+          hasInvalidOcrName ||
+          hasLegacyNoise ||
+          hasWorkplaceCityBug
+        ) {
+          console.log(
+            `[Auto-Repair OCR] Reparando expediente #${r.id} ("${r.full_name}")...`,
           );
-          const hasLegacyNoise = /(Adolfo|Completo|Ro Xt)/i.test(
-            `${r.discrepancy_notes || ""} ${r.ocr_edited_fields || ""}`,
-          );
-          const hasWorkplaceCityBug = Boolean(
-            r.city && /^lampa$/i.test(r.city.trim()),
-          );
-          if (
-            hasInvalidFullName ||
-            hasInvalidOcrName ||
-            hasLegacyNoise ||
-            hasWorkplaceCityBug
-          ) {
-            console.log(
-              `[Auto-Repair OCR] Reparando expediente #${r.id} ("${r.full_name}")...`,
-            );
-            await reprocessCandidateOcr(r.id);
-          }
+          await reprocessCandidateOcr(r.id);
         }
       }
     } catch (e) {
-      console.error("[Auto-Repair OCR Aviso]:", e.message);
+      console.error(
+        `[Arranque] Tarea opcional "auto-reparación OCR" falló; la aplicación sigue operativa: ${redact(e.message)}`,
+      );
     }
   });
 
@@ -4611,11 +4205,12 @@ function startServer(portToUse) {
 
 // Solo arranca al ejecutarse directamente (node src/server.js); al importarse (pruebas) no abre puerto ni BD.
 if (require.main === module) {
-  startServer(parseInt(PORT, 10));
+  main(parseInt(PORT, 10));
 }
 
 module.exports = {
   app,
+  dbConfig,
   initDB,
   getPool: () => pool,
   closeDB: async () => {

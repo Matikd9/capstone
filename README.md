@@ -74,7 +74,7 @@ El proyecto cuenta con una separación limpia entre desarrollo y producción:
 | **Motor de Base de Datos** | MySQL 8.0 en contenedor Docker | TiDB Cloud (Serverless AWS) |
 | **Host / Puerto** | `db:3306` (red interna Docker) o `127.0.0.1:3306` | `gateway01...tidbcloud.com:4000` |
 | **Cifrado TLS/SSL** | Desactivado (`DB_SSL=false`) | Obligatorio TLSv1.2 (`DB_SSL=true`) |
-| **Esquema y Migraciones** | Automático vía `initDB()` al arrancar | Automático vía `initDB()` (100% compatible) |
+| **Esquema y Migraciones** | Migraciones numeradas (`src/db/migrations`) al arrancar | Mismas migraciones; revisar antes con `--status` |
 | **Recarga de Código** | En caliente vía `nodemon` | Contenedor productivo optimizado |
 
 ---
@@ -177,6 +177,16 @@ docker compose down -v
 docker compose up -d
 ```
 
+### Migraciones de base de datos
+El esquema se versiona en `src/db/migrations/NNN_nombre.sql` y se aplica automáticamente al arrancar (tabla `schema_migrations`). Para un cambio de esquema, agrega un archivo con el número siguiente; no edites migraciones ya aplicadas.
+```bash
+docker exec -w /app capstone-app node src/db/migrate.js --status   # solo lectura
+docker exec -w /app capstone-app node src/db/migrate.js --run      # aplica pendientes
+```
+Antes de desplegar contra una base existente (p. ej. TiDB de producción) sigue el procedimiento de [docs/migraciones-produccion.md](docs/migraciones-produccion.md): respaldo verificable, `--status` en solo lectura, revisión de diferencias y ejecución solo con autorización explícita.
+
+Si la BD no responde, una migración falla, el esquema es incompatible o no se cargan los datos semilla obligatorios, la aplicación **no arranca** (código de salida 1).
+
 ### Sincronización con GitHub (Post-limpieza de historial)
 Si el historial fue saneado localmente para purgar adjuntos antiguos o credenciales:
 ```bash
@@ -205,6 +215,7 @@ El repositorio incluye un [Dockerfile](Dockerfile) optimizado para despliegues e
    - `ADMIN_DEFAULT_PASSWORD`: Clave para el primer inicio de sesión admin
    - `SMTP_USER` / `SMTP_PASS`: Credenciales SMTP para el envío de correos (nunca en el código)
    - `PORT`: `8080` (predeterminado para Cloud Run)
+3. **Migraciones de esquema:** antes de desplegar una versión con migraciones nuevas, seguir [docs/migraciones-produccion.md](docs/migraciones-produccion.md).
 
 ---
 
